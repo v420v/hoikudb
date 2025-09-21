@@ -1,0 +1,55 @@
+networks:
+  app_network:
+    driver: bridge
+
+volumes:
+  app_data_mysql:
+    name: ${VOLUME}/mysql
+  app_data_mysql_log:
+    name: ${VOLUME}/mysql_log
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: ./infra/go/Dockerfile.local
+    volumes:
+      - .:/app
+      - ./tmp:/app/tmp
+    environment:
+      - AIR_ROOT=/app
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      - MYSQL_HOST=${MYSQL_HOST}
+      - MYSQL_PORT=${MYSQL_PORT}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - S3_ACCESS_KEY=${S3_ACCESS_KEY}
+      - S3_ACCESS_SECRET_KEY=${S3_ACCESS_SECRET_KEY}
+    tty: true
+    stdin_open: true
+    networks:
+      - app_network
+    depends_on:
+      - db
+
+  db:
+    build:
+      context: .
+      dockerfile: ./infra/mysql/Dockerfile
+    environment:
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+    volumes:
+      - ${VOLUME}/mysql:/var/lib/mysql
+      - ${VOLUME}/mysql_log:/var/log/mysql
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$MYSQL_ROOT_PASSWORD"]
+      interval: 1s
+      timeout: 30s
+      retries: 30
+    networks:
+      - app_network
