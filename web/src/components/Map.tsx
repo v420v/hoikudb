@@ -3,8 +3,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { S3Client } from '@aws-sdk/client-s3';
-import { GetObjectCommand } from "@aws-sdk/client-s3";
 
 interface MapProps {
     className?: string;
@@ -32,32 +30,21 @@ interface FilterOptions {
     ageFilters: AgeFilter[];
 }
 
-const s3 = new S3Client({
-    credentials: {
-        accessKeyId: process.env.NEXT_PUBLIC_S3_ACCESS_KEY || '',
-        secretAccessKey: process.env.NEXT_PUBLIC_S3_ACCESS_SECRET_KEY || '',
-    },
-    region: "ap-northeast-1"
-});
-
+// サーバーサイドAPIを使用してデータを取得
 async function fetchData() {
     try {
-        const command = new GetObjectCommand({
-            Bucket: 'hoipla-monthly',
-            Key: 'latest.json',
-        });
+        const response = await fetch('/api/preschool-data');
 
-        const response = await s3.send(command);
-
-        if (response.Body) {
-            const data = await response.Body.transformToString();
-            console.log(data);
-            return JSON.parse(data);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
         }
-        return null;
+
+        const data = await response.json();
+        console.log('データを取得しました:', data);
+        return data;
 
     } catch (error) {
-        console.error("Error getting file from S3:", error);
+        console.error("データの取得に失敗しました:", error);
         throw error;
     }
 }
