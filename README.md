@@ -3,7 +3,7 @@
 
 ![スクリーンショット](./screenshots/image4.png)
 
-[ほいぷら](hoipla.vercel.app)
+[ほいぷら](https://hoipla.vercel.app)
 
 横浜市のオープンデータを使用して空きのある保育園を楽に探せるサービスです。
 
