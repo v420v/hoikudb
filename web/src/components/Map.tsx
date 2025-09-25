@@ -86,24 +86,15 @@ export default function Map({ className = '' }: MapProps) {
 
             if (filterOptions.ageFilters.length > 0) {
                 for (const ageFilter of filterOptions.ageFilters) {
-                    if (ageFilter.ageClass === 'all') {
-                        const totalAvailableCount = preschool.stats.reduce((sum, stat) =>
-                            sum + Math.max(0, stat.acceptance_count - stat.waiting_count), 0
-                        );
-                        if (totalAvailableCount < ageFilter.minAvailableCount) {
-                            return false;
-                        }
-                    } else {
-                        const matchingStat = preschool.stats.find(stat =>
-                            stat.age_class === ageFilter.ageClass
-                        );
-                        if (!matchingStat) {
-                            return false;
-                        }
-                        const availableCount = Math.max(0, matchingStat.acceptance_count - matchingStat.waiting_count);
-                        if (availableCount < ageFilter.minAvailableCount) {
-                            return false;
-                        }
+                    const matchingStat = preschool.stats.find(stat =>
+                        stat.age_class === ageFilter.ageClass
+                    );
+                    if (!matchingStat) {
+                        return false;
+                    }
+                    const availableCount = Math.max(0, matchingStat.acceptance_count - matchingStat.waiting_count);
+                    if (availableCount < ageFilter.minAvailableCount) {
+                        return false;
                     }
                 }
             }
@@ -372,9 +363,6 @@ export default function Map({ className = '' }: MapProps) {
                                         }))}
                                         className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
                                     >
-                                        {!filters.ageFilters.some((filter, i) => i !== index && filter.ageClass === 'all') && (
-                                            <option value="all">すべて</option>
-                                        )}
                                         {!filters.ageFilters.some((filter, i) => i !== index && filter.ageClass === '０歳児') && (
                                             <option value="０歳児">0歳児</option>
                                         )}
@@ -421,7 +409,7 @@ export default function Map({ className = '' }: MapProps) {
 
                     {/* 条件追加ボタン */}
                     {(() => {
-                        const allAgeClasses = ['all', '０歳児', '１歳児', '２歳児', '3歳児', '4歳児', '5歳児'];
+                        const allAgeClasses = ['０歳児', '１歳児', '２歳児', '3歳児', '4歳児', '5歳児'];
                         const usedAgeClasses = filters.ageFilters.map(filter => filter.ageClass);
                         const availableAgeClasses = allAgeClasses.filter(ageClass => !usedAgeClasses.includes(ageClass));
 
