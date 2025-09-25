@@ -89,10 +89,13 @@ export default function Map({ className = '' }: MapProps) {
                     const matchingStat = preschool.stats.find(stat =>
                         stat.age_class === ageFilter.ageClass
                     );
-                    if (!matchingStat) {
+                    if (!matchingStat && ageFilter.minAvailableCount > 0) {
                         return false;
                     }
-                    const availableCount = Math.max(0, matchingStat.acceptance_count - matchingStat.waiting_count);
+                    if (ageFilter.minAvailableCount === 0) {
+                        return true;
+                    }
+                    const availableCount = Math.max(0, (matchingStat?.acceptance_count ?? 0) - (matchingStat?.waiting_count ?? 0));
                     if (availableCount < ageFilter.minAvailableCount) {
                         return false;
                     }
@@ -364,13 +367,13 @@ export default function Map({ className = '' }: MapProps) {
                                         className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
                                     >
                                         {!filters.ageFilters.some((filter, i) => i !== index && filter.ageClass === '０歳児') && (
-                                            <option value="０歳児">0歳児</option>
+                                            <option value="0歳児">0歳児</option>
                                         )}
                                         {!filters.ageFilters.some((filter, i) => i !== index && filter.ageClass === '１歳児') && (
-                                            <option value="１歳児">1歳児</option>
+                                            <option value="1歳児">1歳児</option>
                                         )}
                                         {!filters.ageFilters.some((filter, i) => i !== index && filter.ageClass === '２歳児') && (
-                                            <option value="２歳児">2歳児</option>
+                                            <option value="2歳児">2歳児</option>
                                         )}
                                         {!filters.ageFilters.some((filter, i) => i !== index && filter.ageClass === '3歳児') && (
                                             <option value="3歳児">3歳児</option>
