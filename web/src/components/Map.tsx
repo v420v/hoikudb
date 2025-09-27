@@ -192,11 +192,6 @@ export default function Map({ className = '' }: MapProps) {
     useEffect(() => {
         if (!map.current || !map.current.isStyleLoaded()) return;
 
-        // データが空の場合は何もしない
-        if (filteredData.length === 0) {
-            return;
-        }
-
         // 既存のレイヤーとソースを安全に削除
         try {
             if (map.current.getLayer('clusters')) {
