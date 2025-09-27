@@ -109,14 +109,16 @@ export default function Map({ className = '' }: MapProps) {
     const calculateBounds = useCallback((data: PreschoolData[]) => {
         if (data.length === 0) return null;
         
-        const coordinates = data.map(preschool => preschool.coordinates);
-        const lngs = coordinates.map(coord => coord[0]);
-        const lats = coordinates.map(coord => coord[1]);
-        
-        const bounds = [
-            [Math.min(...lngs), Math.min(...lats)],
-            [Math.max(...lngs), Math.max(...lats)]
-        ] as [[number, number], [number, number]];
+const bounds = data.reduce<[[number, number], [number, number]]>((acc, { coordinates }) => {
+    const [lng, lat] = coordinates;
+    return [
+        [Math.min(acc[0][0], lng), Math.min(acc[0][1], lat)],
+        [Math.max(acc[1][0], lng), Math.max(acc[1][1], lat)],
+    ];
+}, [
+    [data[0].coordinates[0], data[0].coordinates[1]],
+    [data[0].coordinates[0], data[0].coordinates[1]],
+]);
         
         return bounds;
     }, []);
