@@ -127,8 +127,8 @@ const bounds = data.reduce<[[number, number], [number, number]]>((acc, { coordin
     const moveMapToClusters = useCallback(() => {
         if (!map.current || !map.current.isStyleLoaded() || filteredData.length === 0) return;
 
-        // 少し遅延を入れてクラスターが完全に描画されるのを待つ
-        setTimeout(() => {
+        // マップのレンダリングが完了したタイミングで実行
+        map.current.once('idle', () => {
             if (!map.current) return;
 
             const bounds = calculateBounds(filteredData);
@@ -153,7 +153,7 @@ const bounds = data.reduce<[[number, number], [number, number]]>((acc, { coordin
                     });
                 }
             }
-        }, 100);
+        });
     }, [filteredData, calculateBounds]);
 
     useEffect(() => {
