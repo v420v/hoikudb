@@ -119,12 +119,15 @@ export default function Map({ className = '' }: MapProps) {
         let timeoutId: ReturnType<typeof setTimeout>;
         const debouncedUpdate = () => {
             clearTimeout(timeoutId);
-            timeoutId = setTimeout(updateViewportHeight, 150);
+            timeoutId = setTimeout(updateViewportHeight, 100); // デバウンス時間を短縮
         };
 
+        // 初期化
         updateViewportHeight();
-        window.addEventListener('resize', debouncedUpdate);
-        window.addEventListener('orientationchange', updateViewportHeight);
+        
+        // イベントリスナーを追加
+        window.addEventListener('resize', debouncedUpdate, { passive: true });
+        window.addEventListener('orientationchange', updateViewportHeight, { passive: true });
 
         return () => {
             window.removeEventListener('resize', debouncedUpdate);
@@ -137,33 +140,45 @@ export default function Map({ className = '' }: MapProps) {
         if (map.current) return;
 
         if (mapContainer.current) {
-            map.current = new maplibregl.Map({
-                container: mapContainer.current,
-                style: 'https://tiles.openfreemap.org/styles/bright',
-                center: [139.6380, 35.4437],
-                zoom: 12,
-                pitch: 45, // 45度の傾斜角を設定（0度が真上から、60度が最大）
-                bearing: 0, // 方位角（0度が北向き）
-                renderWorldCopies: false
-            });
+            try {
+                map.current = new maplibregl.Map({
+                    container: mapContainer.current,
+                    style: 'https://tiles.openfreemap.org/styles/bright',
+                    center: [139.6380, 35.4437],
+                    zoom: 12,
+                    pitch: 45, // 45度の傾斜角を設定（0度が真上から、60度が最大）
+                    bearing: 0, // 方位角（0度が北向き）
+                    renderWorldCopies: false
+                });
 
-            map.current.on('load', async () => {
-                const kanagawaBounds: [[number, number], [number, number]] = [
-                    [139.0, 35.1],
-                    [139.9, 35.65]
-                ];
-                map.current!.fitBounds(kanagawaBounds, { padding: 20 });
-                map.current!.setMaxBounds(kanagawaBounds);
-                const allowedSlightlyWiderMinZoom = Math.max(0, map.current!.getZoom() - 0.7);
-                map.current!.setMinZoom(allowedSlightlyWiderMinZoom);
+                map.current.on('load', async () => {
+                    try {
+                        const kanagawaBounds: [[number, number], [number, number]] = [
+                            [139.0, 35.1],
+                            [139.9, 35.65]
+                        ];
+                        map.current!.fitBounds(kanagawaBounds, { padding: 20 });
+                        map.current!.setMaxBounds(kanagawaBounds);
+                        const allowedSlightlyWiderMinZoom = Math.max(0, map.current!.getZoom() - 0.7);
+                        map.current!.setMinZoom(allowedSlightlyWiderMinZoom);
 
-                const uchidachoCenter: [number, number] = [139.631317, 35.453254];
-                map.current!.setCenter(uchidachoCenter);
+                        const uchidachoCenter: [number, number] = [139.631317, 35.453254];
+                        map.current!.setCenter(uchidachoCenter);
 
-                await loadData();
-            });
+                        await loadData();
+                    } catch (error) {
+                        console.error('マップの初期化中にエラーが発生しました:', error);
+                    }
+                });
 
-            map.current.addControl(new maplibregl.NavigationControl(), 'top-right');
+                map.current.on('error', (error) => {
+                    console.error('マップエラー:', error);
+                });
+
+                map.current.addControl(new maplibregl.NavigationControl(), 'top-right');
+            } catch (error) {
+                console.error('マップの作成中にエラーが発生しました:', error);
+            }
         }
 
         return () => {
@@ -177,11 +192,22 @@ export default function Map({ className = '' }: MapProps) {
     useEffect(() => {
         if (!map.current || !map.current.isStyleLoaded()) return;
 
-        if (map.current.getSource('preschools')) {
-            map.current.removeLayer('clusters');
-            map.current.removeLayer('cluster-count');
-            map.current.removeLayer('unclustered-point');
-            map.current.removeSource('preschools');
+        // 既存のレイヤーとソースを安全に削除
+        try {
+            if (map.current.getLayer('clusters')) {
+                map.current.removeLayer('clusters');
+            }
+            if (map.current.getLayer('cluster-count')) {
+                map.current.removeLayer('cluster-count');
+            }
+            if (map.current.getLayer('unclustered-point')) {
+                map.current.removeLayer('unclustered-point');
+            }
+            if (map.current.getSource('preschools')) {
+                map.current.removeSource('preschools');
+            }
+        } catch (error) {
+            console.warn('レイヤーまたはソースの削除中にエラーが発生しました:', error);
         }
 
         const geojsonData = {
@@ -288,8 +314,11 @@ export default function Map({ className = '' }: MapProps) {
         });
 
         map.current.on('click', 'unclustered-point', (e) => {
-            if (e.features && e.features.length > 0) {
-                const properties = e.features[0].properties;
+            const features = map.current!.queryRenderedFeatures(e.point, {
+                layers: ['unclustered-point']
+            });
+            if (features && features.length > 0) {
+                const properties = features[0].properties;
                 const preschool = filteredData.find(p => p.id === properties.id);
                 if (preschool) {
                     setSelectedPreschool(preschool);
