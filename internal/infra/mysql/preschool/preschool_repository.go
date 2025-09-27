@@ -332,3 +332,39 @@ func (r *PreschoolRepository) InsertCsvImportHistory(fileName string, kind strin
 
 	return nil
 }
+
+func (r *PreschoolRepository) FetchAgeClasses() ([]entity.AgeClass, error) {
+	query, args, err := r.goqu.
+		Select(
+			goqu.I("id").As("id"),
+			goqu.I("name").As("name"),
+		).
+		From("age_classes").
+		Order(goqu.I("id").Asc()).
+		ToSQL()
+
+	if err != nil {
+		return []entity.AgeClass{}, err
+	}
+
+	rows, err := r.db.Query(query, args...)
+	if err != nil {
+		return []entity.AgeClass{}, err
+	}
+	defer rows.Close()
+
+	ageClasses := []entity.AgeClass{}
+	for rows.Next() {
+		var ageClass entity.AgeClass
+		err := rows.Scan(
+			&ageClass.Id,
+			&ageClass.Name,
+		)
+		if err != nil {
+			return []entity.AgeClass{}, err
+		}
+		ageClasses = append(ageClasses, ageClass)
+	}
+
+	return ageClasses, nil
+}

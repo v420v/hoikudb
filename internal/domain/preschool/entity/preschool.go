@@ -36,3 +36,8 @@ type PreschoolMonthlyStat struct {
 	Kind               string
 	Value              string
 }
+
+type AgeClass struct {
+	Id   int
+	Name string
+}

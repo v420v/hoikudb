@@ -5,7 +5,9 @@ import (
 	"encoding/csv"
 	"io"
 	"os"
+	"slices"
 	"strings"
+	"time"
 
 	"github.com/v420v/hoipla/internal/domain/preschool/entity"
 	"github.com/v420v/hoipla/internal/domain/preschool/repository"
@@ -69,17 +71,41 @@ func NewImportCsvServiceImpl(
 	}
 }
 
-var ageClassMap = map[string]int{
-	"0歳児": 1,
-	"1歳児": 2,
-	"2歳児": 3,
-	"3歳児": 4,
-	"4歳児": 5,
-	"5歳児": 6,
+const CSV_SKIP_ROW_NUMBER = 2
+
+var csvIdxMap = map[string]int{
+	"施設所在区":   0,
+	"標準地域コード": 1,
+	"施設・事業名":  2,
+	"施設番号":    3,
+	"０歳児":     4,
+	"１歳児":     5,
+	"２歳児":     6,
+	"３歳児":     7,
+	"４歳児":     8,
+	"５歳児":     9,
+	"合計":      10,
+	"更新日":     11,
+}
+
+var csvIdxMapAgeClass = []string{
+	"０歳児",
+	"１歳児",
+	"２歳児",
+	"３歳児",
+	"４歳児",
+	"５歳児",
+}
+
+func (s *ImportCsvServiceImpl) getCsvValue(records []string, key string) string {
+	return records[csvIdxMap[key]]
 }
 
 func (s *ImportCsvServiceImpl) ImportCsv(fileName string, kind string) error {
 	err := mysql.Transaction(context.Background(), func(ctx context.Context) error {
+		now := time.Now()
+		targetMonthDate := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location()).Format("2006-01-02")
+
 		err := s.preschoolRepository.InsertCsvImportHistory(fileName, kind)
 		if err != nil {
 			return err
@@ -98,6 +124,11 @@ func (s *ImportCsvServiceImpl) ImportCsv(fileName string, kind string) error {
 		preschoolMap := make(map[string]entity.Preschool)
 		for _, preschool := range preFetchPreschools {
 			preschoolMap[preschool.BuildingCode] = preschool
+		}
+
+		ageClasses, err := s.preschoolRepository.FetchAgeClasses()
+		if err != nil {
+			return err
 		}
 
 		f, err := os.Open(fileName)
@@ -119,17 +150,20 @@ func (s *ImportCsvServiceImpl) ImportCsv(fileName string, kind string) error {
 			if err != nil {
 				return err
 			}
-			if strings.TrimSpace(records[0]) == "" || strings.TrimSpace(records[1]) == "" || strings.TrimSpace(records[2]) == "" || strings.TrimSpace(records[3]) == "" {
+			if strings.TrimSpace(s.getCsvValue(records, "施設所在区")) == "" ||
+				strings.TrimSpace(s.getCsvValue(records, "標準地域コード")) == "" ||
+				strings.TrimSpace(s.getCsvValue(records, "施設・事業名")) == "" ||
+				strings.TrimSpace(s.getCsvValue(records, "施設番号")) == "" {
 				lineNumber++
 				continue
 			}
-			if lineNumber <= 2 {
+			if lineNumber <= CSV_SKIP_ROW_NUMBER {
 				lineNumber++
 				continue
 			}
 
-			preschoolName := records[2]
-			preschoolBuildingCode := records[3]
+			preschoolName := s.getCsvValue(records, "施設・事業名")
+			preschoolBuildingCode := s.getCsvValue(records, "施設番号")
 
 			if _, ok := preschoolMap[preschoolBuildingCode]; !ok {
 				insertNeededPreschools = append(insertNeededPreschools, entity.Preschool{
@@ -140,19 +174,25 @@ func (s *ImportCsvServiceImpl) ImportCsv(fileName string, kind string) error {
 
 			insertNeededPreschoolMonthlyStats[preschoolBuildingCode] = make([]*entity.PreschoolMonthlyStat, 0)
 
-			for _, ageClassId := range ageClassMap {
-				value := records[4+ageClassId]
-				if value == "-" || value == "" {
-					continue
+			for idx, csvRowName := range csvIdxMapAgeClass {
+				value := s.getCsvValue(records, csvRowName)
+				invalidValues := []string{"-", ""}
+				if slices.Contains(invalidValues, strings.TrimSpace(value)) {
+					value = "0"
 				}
+
 				preschoolMonthlyStat := &entity.PreschoolMonthlyStat{
 					CsvImportHistoryId: csvImportHistory.Id,
-					AgeClassId:         ageClassId,
-					TargetMonth:        "2025-09-01",
+					AgeClassId:         ageClasses[idx].Id,
+					TargetMonth:        targetMonthDate,
 					Kind:               kind,
 					Value:              value,
 				}
-				insertNeededPreschoolMonthlyStats[preschoolBuildingCode] = append(insertNeededPreschoolMonthlyStats[preschoolBuildingCode], preschoolMonthlyStat)
+
+				insertNeededPreschoolMonthlyStats[preschoolBuildingCode] = append(
+					insertNeededPreschoolMonthlyStats[preschoolBuildingCode],
+					preschoolMonthlyStat,
+				)
 			}
 		}
 

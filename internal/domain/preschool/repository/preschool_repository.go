@@ -11,4 +11,5 @@ type PreschoolRepository interface {
 	FetchLatestCsvImportHistory(kind string) (entity.CsvImportHistory, error)
 	InsertPreschoolMonthlyStats(preschoolMonthlyStats []entity.PreschoolMonthlyStat) error
 	FetchLatestCsvImportHistories() ([]entity.CsvImportHistory, error)
+	FetchAgeClasses() ([]entity.AgeClass, error)
 }
