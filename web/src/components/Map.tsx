@@ -105,10 +105,66 @@ export default function Map({ className = '' }: MapProps) {
         });
     }, []);
 
+    // クラスターの境界を計算する関数
+    const calculateBounds = useCallback((data: PreschoolData[]) => {
+        if (data.length === 0) return null;
+        
+        const coordinates = data.map(preschool => preschool.coordinates);
+        const lngs = coordinates.map(coord => coord[0]);
+        const lats = coordinates.map(coord => coord[1]);
+        
+        const bounds = [
+            [Math.min(...lngs), Math.min(...lats)],
+            [Math.max(...lngs), Math.max(...lats)]
+        ] as [[number, number], [number, number]];
+        
+        return bounds;
+    }, []);
+
+    // 地図をクラスターの位置に移動する関数
+    const moveMapToClusters = useCallback(() => {
+        if (!map.current || !map.current.isStyleLoaded() || filteredData.length === 0) return;
+
+        // 少し遅延を入れてクラスターが完全に描画されるのを待つ
+        setTimeout(() => {
+            if (!map.current) return;
+
+            const bounds = calculateBounds(filteredData);
+            if (bounds) {
+                // 現在のビューポートの境界を取得
+                const currentBounds = map.current.getBounds();
+                const currentSouthWest = currentBounds.getSouthWest();
+                const currentNorthEast = currentBounds.getNorthEast();
+                
+                // クラスターの境界が現在のビューポート内にあるかチェック
+                const isClusterInViewport = 
+                    bounds[0][0] >= currentSouthWest.lng && 
+                    bounds[0][1] >= currentSouthWest.lat &&
+                    bounds[1][0] <= currentNorthEast.lng && 
+                    bounds[1][1] <= currentNorthEast.lat;
+
+                // クラスターが画面外の場合は地図を移動
+                if (!isClusterInViewport) {
+                    map.current.fitBounds(bounds, { 
+                        padding: 50,
+                        maxZoom: 15 // 最大ズームレベルを制限
+                    });
+                }
+            }
+        }, 100);
+    }, [filteredData, calculateBounds]);
+
     useEffect(() => {
         const filtered = applyFilters(allData, filters);
         setFilteredData(filtered);
     }, [allData, filters, applyFilters]);
+
+    // 検索結果が更新された時に地図をクラスター位置に移動
+    useEffect(() => {
+        if (filteredData.length > 0) {
+            moveMapToClusters();
+        }
+    }, [filteredData, moveMapToClusters]);
 
     // iOS Safariのビューポート高さ問題を解決
     useEffect(() => {
