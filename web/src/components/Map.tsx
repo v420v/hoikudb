@@ -331,7 +331,7 @@ export default function Map({ className = '' }: MapProps) {
                     <div>
                         <h2 className="text-xl font-bold text-gray-800">保育園検索</h2>
                         <p className="text-sm text-gray-600 mt-1">
-                            検索結果: <span className="font-semibold text-blue-600">{filteredData.length}</span>件
+                            検索結果: <span className="font-semibold text-blue-600">{filteredData.length.toLocaleString('ja-JP')}</span>件
                         </p>
                     </div>
                     <button
