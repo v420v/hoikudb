@@ -86,17 +86,15 @@ export default function Map({ className = '' }: MapProps) {
 
             if (filterOptions.ageFilters.length > 0) {
                 for (const ageFilter of filterOptions.ageFilters) {
+                    const requiredMin = Math.max(1, ageFilter.minAvailableCount || 1);
                     const matchingStat = preschool.stats.find(stat =>
                         stat.age_class === ageFilter.ageClass
                     );
-                    if (!matchingStat && ageFilter.minAvailableCount > 0) {
+                    if (!matchingStat) {
                         return false;
                     }
-                    if (ageFilter.minAvailableCount === 0) {
-                        return true;
-                    }
                     const availableCount = Math.max(0, (matchingStat?.acceptance_count ?? 0) - (matchingStat?.waiting_count ?? 0));
-                    if (availableCount < ageFilter.minAvailableCount) {
+                    if (availableCount < requiredMin) {
                         return false;
                     }
                 }
@@ -353,7 +351,7 @@ export default function Map({ className = '' }: MapProps) {
                                 </button>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-3">
+                            <div className="grid grid-cols-1 gap-3">
                                 <div>
                                     <label className="block text-xs text-gray-600 mb-1">年齢クラス</label>
                                     <select
@@ -366,13 +364,13 @@ export default function Map({ className = '' }: MapProps) {
                                         }))}
                                         className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
                                     >
-                                        {!filters.ageFilters.some((filter, i) => i !== index && filter.ageClass === '０歳児') && (
+                                        {!filters.ageFilters.some((filter, i) => i !== index && filter.ageClass === '0歳児') && (
                                             <option value="0歳児">0歳児</option>
                                         )}
-                                        {!filters.ageFilters.some((filter, i) => i !== index && filter.ageClass === '１歳児') && (
+                                        {!filters.ageFilters.some((filter, i) => i !== index && filter.ageClass === '1歳児') && (
                                             <option value="1歳児">1歳児</option>
                                         )}
-                                        {!filters.ageFilters.some((filter, i) => i !== index && filter.ageClass === '２歳児') && (
+                                        {!filters.ageFilters.some((filter, i) => i !== index && filter.ageClass === '2歳児') && (
                                             <option value="2歳児">2歳児</option>
                                         )}
                                         {!filters.ageFilters.some((filter, i) => i !== index && filter.ageClass === '3歳児') && (
@@ -389,21 +387,52 @@ export default function Map({ className = '' }: MapProps) {
 
                                 <div>
                                     <label className="block text-xs text-gray-600 mb-1">空き数</label>
-                                    <div className="relative">
+                                    <div className="flex items-stretch">
+                                        <button
+                                            type="button"
+                                            onClick={() => setFilters(prev => ({
+                                                ...prev,
+                                                ageFilters: prev.ageFilters.map((filter, i) => {
+                                                    if (i !== index) return filter;
+                                                    const next = Math.max(1, (filter.minAvailableCount || 1) - 1);
+                                                    return { ...filter, minAvailableCount: next };
+                                                })
+                                            }))}
+                                            className="px-3 py-1 border border-gray-300 rounded-l text-gray-700 bg-white active:bg-gray-50"
+                                            aria-label="空き数を減らす"
+                                        >
+                                            −
+                                        </button>
                                         <input
                                             type="number"
-                                            min="0"
-                                            value={ageFilter.minAvailableCount}
+                                            inputMode="numeric"
+                                            min={1}
+                                            value={Math.max(1, ageFilter.minAvailableCount || 1)}
                                             onChange={(e) => setFilters(prev => ({
                                                 ...prev,
                                                 ageFilters: prev.ageFilters.map((filter, i) =>
-                                                    i === index ? { ...filter, minAvailableCount: parseInt(e.target.value) || 0 } : filter
+                                                    i === index ? { ...filter, minAvailableCount: Math.max(1, parseInt(e.target.value) || 1) } : filter
                                                 )
                                             }))}
-                                            className="w-full px-2 py-1 pr-8 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                            placeholder="例: 1"
+                                            className="w-full max-w-[6rem] text-center px-2 py-1 border-t border-b border-gray-300 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                            placeholder="1"
                                         />
-                                        <div className="absolute right-2 top-1 text-xs text-gray-500">人以上</div>
+                                        <button
+                                            type="button"
+                                            onClick={() => setFilters(prev => ({
+                                                ...prev,
+                                                ageFilters: prev.ageFilters.map((filter, i) => {
+                                                    if (i !== index) return filter;
+                                                    const next = (filter.minAvailableCount || 1) + 1;
+                                                    return { ...filter, minAvailableCount: next };
+                                                })
+                                            }))}
+                                            className="px-3 py-1 border border-gray-300 rounded-r text-gray-700 bg-white active:bg-gray-50"
+                                            aria-label="空き数を増やす"
+                                        >
+                                            ＋
+                                        </button>
+                                        <div className="ml-2 flex items-center text-xs text-gray-500">人以上</div>
                                     </div>
                                 </div>
                             </div>
@@ -412,7 +441,7 @@ export default function Map({ className = '' }: MapProps) {
 
                     {/* 条件追加ボタン */}
                     {(() => {
-                        const allAgeClasses = ['０歳児', '１歳児', '２歳児', '3歳児', '4歳児', '5歳児'];
+                        const allAgeClasses = ['0歳児', '1歳児', '2歳児', '3歳児', '4歳児', '5歳児'];
                         const usedAgeClasses = filters.ageFilters.map(filter => filter.ageClass);
                         const availableAgeClasses = allAgeClasses.filter(ageClass => !usedAgeClasses.includes(ageClass));
 
@@ -420,7 +449,7 @@ export default function Map({ className = '' }: MapProps) {
                             <button
                                 onClick={() => setFilters(prev => ({
                                     ...prev,
-                                    ageFilters: [...prev.ageFilters, { ageClass: availableAgeClasses[0], minAvailableCount: 0 }]
+                                    ageFilters: [...prev.ageFilters, { ageClass: availableAgeClasses[0], minAvailableCount: 1 }]
                                 }))}
                                 className="w-full px-3 py-2 border-2 border-dashed border-gray-300 rounded-md text-gray-600 hover:border-blue-400 hover:text-blue-600 transition-colors flex items-center justify-center"
                             >
