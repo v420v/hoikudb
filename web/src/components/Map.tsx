@@ -60,6 +60,7 @@ export default function Map({ className = '' }: MapProps) {
     });
     const [selectedPreschool, setSelectedPreschool] = useState<PreschoolData | null>(null);
     const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(true);
+    const [viewportHeight, setViewportHeight] = useState('100vh');
 
     const loadData = useCallback(async () => {
         try {
@@ -108,6 +109,23 @@ export default function Map({ className = '' }: MapProps) {
         const filtered = applyFilters(allData, filters);
         setFilteredData(filtered);
     }, [allData, filters, applyFilters]);
+
+    // iOS Safariのビューポート高さ問題を解決
+    useEffect(() => {
+        const updateViewportHeight = () => {
+            const vh = window.innerHeight * 0.01;
+            setViewportHeight(`${window.innerHeight}px`);
+        };
+
+        updateViewportHeight();
+        window.addEventListener('resize', updateViewportHeight);
+        window.addEventListener('orientationchange', updateViewportHeight);
+
+        return () => {
+            window.removeEventListener('resize', updateViewportHeight);
+            window.removeEventListener('orientationchange', updateViewportHeight);
+        };
+    }, []);
 
     useEffect(() => {
         if (map.current) return;
@@ -288,7 +306,10 @@ export default function Map({ className = '' }: MapProps) {
     }, [filteredData]);
 
     return (
-        <div className={`relative w-full h-full ${className}`}>
+        <div 
+            className={`relative w-full h-full ${className}`}
+            style={{ height: viewportHeight }}
+        >
             {/* タイトル */}
             <div className="absolute top-4 left-4 z-30 rounded-lg px-0 py-4">
                 <h1 className="text-3xl font-bold text-gray-800 tracking-wide">ほいぷら</h1>
@@ -565,7 +586,10 @@ export default function Map({ className = '' }: MapProps) {
             <div
                 ref={mapContainer}
                 className="w-full h-full"
-                style={{ minHeight: '100vh' }}
+                style={{ 
+                    height: viewportHeight,
+                    minHeight: viewportHeight
+                }}
             />
         </div>
     );
