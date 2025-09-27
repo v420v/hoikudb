@@ -118,6 +118,8 @@ export default function Map({ className = '' }: MapProps) {
                 style: 'https://tiles.openfreemap.org/styles/bright',
                 center: [139.6380, 35.4437],
                 zoom: 12,
+                pitch: 45, // 45度の傾斜角を設定（0度が真上から、60度が最大）
+                bearing: 0, // 方位角（0度が北向き）
                 renderWorldCopies: false
             });
 
