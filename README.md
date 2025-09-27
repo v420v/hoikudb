@@ -1,7 +1,7 @@
 
 # ほいぷら - 保育園検索サービス
 
-![スクリーンショット](./screenshots/image4.png)
+![スクリーンショット](./screenshots/image5.png)
 
 [ほいぷら](https://hoipla.vercel.app)
 
