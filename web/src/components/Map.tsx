@@ -113,17 +113,23 @@ export default function Map({ className = '' }: MapProps) {
     // iOS Safariのビューポート高さ問題を解決
     useEffect(() => {
         const updateViewportHeight = () => {
-            const vh = window.innerHeight * 0.01;
             setViewportHeight(`${window.innerHeight}px`);
         };
 
+        let timeoutId: ReturnType<typeof setTimeout>;
+        const debouncedUpdate = () => {
+            clearTimeout(timeoutId);
+            timeoutId = setTimeout(updateViewportHeight, 150);
+        };
+
         updateViewportHeight();
-        window.addEventListener('resize', updateViewportHeight);
+        window.addEventListener('resize', debouncedUpdate);
         window.addEventListener('orientationchange', updateViewportHeight);
 
         return () => {
-            window.removeEventListener('resize', updateViewportHeight);
+            window.removeEventListener('resize', debouncedUpdate);
             window.removeEventListener('orientationchange', updateViewportHeight);
+            clearTimeout(timeoutId);
         };
     }, []);
 
