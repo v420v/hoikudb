@@ -408,7 +408,7 @@ const bounds = data.reduce<[[number, number], [number, number]]>((acc, { coordin
             </div>
             {/* フィルターパネル */}
             <div
-                className={`absolute top-20 left-4 z-10 bg-white rounded-lg shadow-2xl p-4 sm:p-6 w-72 sm:w-80 max-h-[calc(100vh-6rem)] overflow-y-auto transition-transform duration-150 ease-out ${isFilterPanelOpen ? 'translate-x-0' : '-translate-x-[calc(100%+1rem)]'}`}
+                className={`absolute top-20 left-4 z-10 bg-white rounded-lg shadow-2xl p-4 sm:p-6 w-72 sm:w-80 max-h-[calc(var(--app-vh)-6rem)] overflow-y-auto transition-transform duration-150 ease-out ${isFilterPanelOpen ? 'translate-x-0' : '-translate-x-[calc(100%+1rem)]'}`}
                 style={{
                     boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.05)'
                 }}

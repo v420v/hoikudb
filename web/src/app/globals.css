@@ -3,6 +3,14 @@
 :root {
   --background: #FFFFFF;
   --foreground: #1A1A1A;
+  /* 安全なビューポート高（iOS対応） */
+  --app-vh: 100dvh;
+}
+
+@supports not (height: 100dvh) {
+  :root {
+    --app-vh: 100vh;
+  }
 }
 
 @theme inline {
@@ -21,6 +29,7 @@ body {
 html, body, #__next {
   height: 100%;
   width: 100%;
+  overflow: hidden; /* 画面全体の縦スクロールを抑止 */
 }
 
 /* マップピンのアニメーション */

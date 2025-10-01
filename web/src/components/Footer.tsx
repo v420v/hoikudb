@@ -6,7 +6,7 @@ export default function Footer() {
   const [isExpanded, setIsExpanded] = useState(false);
 
   return (
-    <footer className="bg-white border-t border-gray-200 shadow-lg">
+    <footer className="bg-white border-t border-gray-200 shadow-lg flex-shrink-0">
       <div className="max-w-7xl mx-auto px-4">
         {/* コンパクト表示 */}
         <div className="py-2 sm:py-3">
