@@ -59,7 +59,7 @@ export default function Map({ className = '' }: MapProps) {
         ageFilters: []
     });
     const [selectedPreschool, setSelectedPreschool] = useState<PreschoolData | null>(null);
-    const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(true);
+    const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
     const [viewportHeight, setViewportHeight] = useState('100vh');
 
     const loadData = useCallback(async () => {
@@ -401,7 +401,6 @@ const bounds = data.reduce<[[number, number], [number, number]]>((acc, { coordin
     return (
         <div 
             className={`relative w-full h-full ${className}`}
-            style={{ height: viewportHeight }}
         >
             {/* タイトル */}
             <div className="absolute top-4 left-4 z-30 rounded-lg px-0 py-4">
@@ -684,10 +683,6 @@ const bounds = data.reduce<[[number, number], [number, number]]>((acc, { coordin
             <div
                 ref={mapContainer}
                 className="w-full h-full"
-                style={{ 
-                    height: viewportHeight,
-                    minHeight: viewportHeight
-                }}
             />
         </div>
     );
