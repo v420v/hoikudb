@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "保育園マップ - 神奈川県",
-  description: "神奈川県の保育園情報を地図上で検索・表示できるアプリです",
+  title: "ほいぷら - 保育園検索",
+  description: "保育園の空き情報を地図から探せるサービスです",
 };
 
 export default function RootLayout({
