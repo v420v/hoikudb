@@ -332,11 +332,17 @@ export default function Map({ className = '' }: MapProps) {
             </div>
             {/* フィルターパネル */}
             <div
-                className={`absolute top-20 left-4 z-10 bg-white rounded-lg shadow-2xl p-4 sm:p-6 w-72 sm:w-80 max-h-[calc(var(--app-vh)-6rem)] overflow-y-auto transition-transform duration-150 ease-out ${isFilterPanelOpen ? 'translate-x-0' : '-translate-x-[calc(100%+1rem)]'}`}
-                style={{
-                    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.05)'
-                }}
+                className={`fixed inset-0 z-10 flex items-center justify-center p-4 ${isFilterPanelOpen ? 'pointer-events-auto' : 'pointer-events-none'} transition-opacity duration-300 ${isFilterPanelOpen ? 'opacity-100' : 'opacity-0'}`}
+                onClick={() => setIsFilterPanelOpen(false)}
             >
+                <div
+                    className="bg-white rounded-lg shadow-2xl p-4 sm:p-6 w-72 sm:w-80 max-h-[calc(var(--app-vh)-6rem)] overflow-y-auto"
+                    style={{
+                        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.05)',
+                        animation: isFilterPanelOpen ? 'slideUpFromCenter 300ms cubic-bezier(0.16, 1, 0.3, 1)' : undefined
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                >
                 <div className="flex justify-between items-center mb-4">
                     <div>
                         <h2 className="text-xl font-bold text-gray-800">保育園検索</h2>
@@ -516,6 +522,7 @@ export default function Map({ className = '' }: MapProps) {
                 >
                     検索条件をリセット
                 </button>
+                </div>
             </div>
 
             {/* フィルターパネル開閉ボタン */}
@@ -536,16 +543,15 @@ export default function Map({ className = '' }: MapProps) {
 
             {/* 保育園詳細モーダル */}
             <div
-                className={`absolute inset-0 z-20 flex items-end justify-end p-4 pointer-events-none transition-opacity duration-300 ${selectedPreschool ? 'opacity-100' : 'opacity-0 pointer-events-none'
-                    }`}
+                className={`fixed inset-0 z-20 flex items-center justify-center p-4 ${selectedPreschool ? 'pointer-events-auto' : 'pointer-events-none'} transition-opacity duration-300 ${selectedPreschool ? 'opacity-100' : 'opacity-0'}`}
                 onClick={() => setSelectedPreschool(null)}
             >
                 {selectedPreschool && (
                     <div
-                        className="bg-white rounded-lg shadow-2xl p-4 sm:p-6 w-80 sm:w-96 max-h-[80vh] overflow-y-auto pointer-events-auto transform transition-transform duration-100 ease-out translate-x-0"
+                        className="bg-white rounded-lg shadow-2xl p-4 sm:p-6 w-80 sm:w-96 max-h-[80vh] overflow-y-auto pointer-events-auto transform transition-transform duration-200 ease-out"
                         style={{
                             boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.05)',
-                            animation: 'slideInFromRight 0.15s cubic-bezier(0.25, 0.46, 0.45, 0.94)'
+                            animation: 'slideUpFromCenter 300ms cubic-bezier(0.16, 1, 0.3, 1)'
                         }}
                         onClick={(e) => e.stopPropagation()}
                     >

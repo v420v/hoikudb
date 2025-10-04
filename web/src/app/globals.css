@@ -71,6 +71,18 @@ html, body, #__next {
   }
 }
 
+/* スライドアップアニメーション（画面中央表示用） */
+@keyframes slideUpFromCenter {
+  0% {
+    transform: translateY(30px) scale(0.95);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
 /* マップコンテナのスタイル */
 .map-container {
   position: relative;
