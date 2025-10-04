@@ -569,12 +569,10 @@ export default function Map({ className = '' }: MapProps) {
                                         <th className="border border-gray-300 px-3 py-2 text-center text-sm font-semibold text-gray-700">在園</th>
                                         <th className="border border-gray-300 px-3 py-2 text-center text-sm font-semibold text-gray-700">受け入れ</th>
                                         <th className="border border-gray-300 px-3 py-2 text-center text-sm font-semibold text-gray-700">待機</th>
-                                        <th className="border border-gray-300 px-3 py-2 text-center text-sm font-semibold text-gray-700">空き</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {selectedPreschool.stats.map((stat, index) => {
-                                        const availableCount = Math.max(0, stat.acceptance_count - stat.waiting_count);
                                         return (
                                             <tr key={index} className="hover:bg-gray-50">
                                                 <td className="border border-gray-300 px-3 py-2 text-sm font-medium text-gray-800">
@@ -588,10 +586,6 @@ export default function Map({ className = '' }: MapProps) {
                                                 </td>
                                                 <td className="border border-gray-300 px-3 py-2 text-center text-sm text-gray-600 font-semibold">
                                                     {stat.waiting_count}人
-                                                </td>
-                                                <td className={`border border-gray-300 px-3 py-2 text-center text-sm font-semibold ${availableCount > 0 ? 'text-green-600' : 'text-gray-500'
-                                                    }`}>
-                                                    {availableCount}人
                                                 </td>
                                             </tr>
                                         );
