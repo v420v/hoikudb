@@ -78,14 +78,18 @@ export default function Map({ className = '' }: MapProps) {
     const [selectedPreschool, setSelectedPreschool] = useState<PreschoolData | null>(null);
     const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
     const [viewportHeight, setViewportHeight] = useState('100vh');
+    const [isLoading, setIsLoading] = useState(true);
 
     const loadData = useCallback(async () => {
         try {
+            setIsLoading(true);
             const geoJSONData = await fetchData();
             setAllGeoJSONData(geoJSONData);
             setFilteredGeoJSONData(geoJSONData);
         } catch (error) {
             console.error('データの取得に失敗しました:', error);
+        } finally {
+            setIsLoading(false);
         }
     }, []);
 
@@ -185,15 +189,19 @@ export default function Map({ className = '' }: MapProps) {
                     zoom: 15,
                     pitch: 53, // 45度の傾斜角を設定（0度が真上から、60度が最大）
                     bearing: 0, // 方位角（0度が北向き）
-                    renderWorldCopies: false
+                    renderWorldCopies: false,
+                    // 地図の表示を早くするための設定
+                    maxZoom: 18,
+                    minZoom: 10,
+                    // 地図の読み込みを最適化
+                    attributionControl: false
                 });
 
-                map.current.on('load', async () => {
-                    try {
-                        await loadData();
-                    } catch (error) {
-                        console.error('マップの初期化中にエラーが発生しました:', error);
-                    }
+                map.current.on('load', () => {
+                    // 地図の初期化完了後、非同期でデータを読み込み
+                    loadData().catch(error => {
+                        console.error('データの読み込み中にエラーが発生しました:', error);
+                    });
                 });
 
                 map.current.on('error', (error) => {
@@ -375,6 +383,20 @@ export default function Map({ className = '' }: MapProps) {
             <div className="absolute top-4 left-4 z-30 rounded-lg px-0 py-4">
                 <h1 className="text-3xl font-bold text-gray-800 tracking-wide">ほいぷら</h1>
             </div>
+
+            {/* ローディング表示 */}
+            {isLoading && (
+                <div 
+                    className="absolute right-2.5 z-30 bg-white rounded-lg shadow-2xl px-4 py-3 flex items-center"
+                    style={{
+                        top: '120px',
+                        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.05)'
+                    }}
+                >
+                    <div className="animate-spin rounded-full h-5 w-5 border-2 border-gray-300 border-t-blue-500 mr-3"></div>
+                    <span className="text-sm font-medium text-gray-700">データを読み込み中...</span>
+                </div>
+            )}
             {/* フィルターパネル */}
             <div
                 className={`fixed inset-0 z-10 flex items-center justify-center p-4 ${isFilterPanelOpen ? 'pointer-events-auto' : 'pointer-events-none'} transition-opacity duration-300 ${isFilterPanelOpen ? 'opacity-100' : 'opacity-0'}`}
@@ -571,18 +593,21 @@ export default function Map({ className = '' }: MapProps) {
             </div>
 
             {/* フィルターパネル開閉ボタン */}
-            <button
-                onClick={() => setIsFilterPanelOpen(!isFilterPanelOpen)}
-                className="absolute top-20 left-4 z-10 bg-white rounded-lg shadow-2xl p-3 hover:bg-gray-50 transition-colors duration-150 cursor-pointer"
-                style={{
-                    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.05)'
-                }}
-                aria-label={isFilterPanelOpen ? "フィルターパネルを閉じる" : "フィルターパネルを開く"}
-            >
-                <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-            </button>
+            {!isLoading && (
+                <button
+                    onClick={() => setIsFilterPanelOpen(!isFilterPanelOpen)}
+                    className="absolute right-2.5 z-10 bg-white rounded-lg shadow-2xl p-3 hover:bg-gray-50 transition-colors duration-150 cursor-pointer"
+                    style={{
+                        top: '120px',
+                        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.05)'
+                    }}
+                    aria-label={isFilterPanelOpen ? "フィルターパネルを閉じる" : "フィルターパネルを開く"}
+                >
+                    <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                </button>
+            )}
 
             {/* 保育園詳細モーダル */}
             <div
