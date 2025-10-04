@@ -20,6 +20,29 @@ interface PreschoolData {
     coordinates: [number, number];
 }
 
+interface GeoJSONFeature {
+    type: 'Feature';
+    properties: {
+        id: number;
+        name: string;
+        stats: Array<{
+            age_class: string;
+            acceptance_count: number;
+            children_count: number;
+            waiting_count: number;
+        }>;
+    };
+    geometry: {
+        type: 'Point';
+        coordinates: [number, number];
+    };
+}
+
+interface GeoJSONData {
+    type: 'FeatureCollection';
+    features: GeoJSONFeature[];
+}
+
 interface AgeFilter {
     ageClass: string;
     minAvailableCount: number;
@@ -30,7 +53,6 @@ interface FilterOptions {
     ageFilters: AgeFilter[];
 }
 
-// サーバーサイドAPIを使用してデータを取得
 async function fetchData() {
     try {
         const response = await fetch('/api/preschool-data');
@@ -47,8 +69,8 @@ async function fetchData() {
 export default function Map({ className = '' }: MapProps) {
     const mapContainer = useRef<HTMLDivElement>(null);
     const map = useRef<maplibregl.Map | null>(null);
-    const [allData, setAllData] = useState<PreschoolData[]>([]);
-    const [filteredData, setFilteredData] = useState<PreschoolData[]>([]);
+    const [allGeoJSONData, setAllGeoJSONData] = useState<GeoJSONData | null>(null);
+    const [filteredGeoJSONData, setFilteredGeoJSONData] = useState<GeoJSONData | null>(null);
     const [filters, setFilters] = useState<FilterOptions>({
         searchQuery: '',
         ageFilters: []
@@ -59,22 +81,35 @@ export default function Map({ className = '' }: MapProps) {
 
     const loadData = useCallback(async () => {
         try {
-            const response = await fetchData();
-            const preschools: PreschoolData[] = response.features.map((feature: any) => ({
-                id: feature.properties.id,
-                name: feature.properties.name,
-                stats: feature.properties.stats,
-                coordinates: feature.geometry.coordinates.slice(0, 2) as [number, number]
-            }));
-            setAllData(preschools);
-            setFilteredData(preschools);
+            const geoJSONData = await fetchData();
+            setAllGeoJSONData(geoJSONData);
+            setFilteredGeoJSONData(geoJSONData);
         } catch (error) {
             console.error('データの取得に失敗しました:', error);
         }
     }, []);
 
-    const applyFilters = useCallback((data: PreschoolData[], filterOptions: FilterOptions) => {
-        return data.filter(preschool => {
+    const applyFilters = useCallback((geoJSONData: GeoJSONData, filterOptions: FilterOptions) => {
+        const filteredFeatures = geoJSONData.features.filter(feature => {
+            // statsが文字列（JSON）の場合はパース
+            let stats = [];
+            if (typeof feature.properties.stats === 'string') {
+                try {
+                    stats = JSON.parse(feature.properties.stats);
+                } catch (error) {
+                    stats = [];
+                }
+            } else if (Array.isArray(feature.properties.stats)) {
+                stats = feature.properties.stats;
+            }
+
+            const preschool = {
+                id: feature.properties.id,
+                name: feature.properties.name,
+                stats: stats,
+                coordinates: feature.geometry.coordinates.slice(0, 2) as [number, number]
+            };
+
             if (filterOptions.searchQuery &&
                 !preschool.name.toLowerCase().includes(filterOptions.searchQuery.toLowerCase())) {
                 return false;
@@ -83,7 +118,7 @@ export default function Map({ className = '' }: MapProps) {
             if (filterOptions.ageFilters.length > 0) {
                 for (const ageFilter of filterOptions.ageFilters) {
                     const requiredMin = Math.max(1, ageFilter.minAvailableCount || 1);
-                    const matchingStat = preschool.stats.find(stat =>
+                    const matchingStat = preschool.stats.find((stat: any) =>
                         stat.age_class === ageFilter.ageClass
                     );
                     if (!matchingStat) {
@@ -98,12 +133,19 @@ export default function Map({ className = '' }: MapProps) {
 
             return true;
         });
+
+        return {
+            type: 'FeatureCollection' as const,
+            features: filteredFeatures
+        };
     }, []);
 
     useEffect(() => {
-        const filtered = applyFilters(allData, filters);
-        setFilteredData(filtered);
-    }, [allData, filters, applyFilters]);
+        if (allGeoJSONData) {
+            const filtered = applyFilters(allGeoJSONData, filters);
+            setFilteredGeoJSONData(filtered);
+        }
+    }, [allGeoJSONData, filters, applyFilters]);
 
     // iOS Safariのビューポート高さ問題を解決
     useEffect(() => {
@@ -192,25 +234,11 @@ export default function Map({ className = '' }: MapProps) {
             console.warn('レイヤーまたはソースの削除中にエラーが発生しました:', error);
         }
 
-        const geojsonData = {
-            type: 'FeatureCollection' as const,
-            features: filteredData.map(preschool => ({
-                type: 'Feature' as const,
-                properties: {
-                    id: preschool.id,
-                    name: preschool.name,
-                    stats: preschool.stats
-                },
-                geometry: {
-                    type: 'Point' as const,
-                    coordinates: preschool.coordinates
-                }
-            }))
-        };
+        if (!filteredGeoJSONData) return;
 
         map.current.addSource('preschools', {
             type: 'geojson',
-            data: geojsonData as maplibregl.GeoJSONSourceSpecification['data'],
+            data: filteredGeoJSONData as maplibregl.GeoJSONSourceSpecification['data'],
             cluster: true,
             clusterMaxZoom: 14,
             clusterRadius: 50
@@ -301,8 +329,25 @@ export default function Map({ className = '' }: MapProps) {
             });
             if (features && features.length > 0) {
                 const properties = features[0].properties;
-                const preschool = filteredData.find(p => p.id === properties.id);
-                if (preschool) {
+                const geometry = features[0].geometry as GeoJSON.Point;
+                if (geometry.type === 'Point') {
+                    let stats = [];
+                    if (typeof properties.stats === 'string') {
+                        try {
+                            stats = JSON.parse(properties.stats);
+                        } catch (error) {
+                            stats = [];
+                        }
+                    } else if (Array.isArray(properties.stats)) {
+                        stats = properties.stats;
+                    }
+
+                    const preschool = {
+                        id: properties.id,
+                        name: properties.name,
+                        stats: stats,
+                        coordinates: geometry.coordinates.slice(0, 2) as [number, number]
+                    };
                     setSelectedPreschool(preschool);
                 }
             }
@@ -320,7 +365,7 @@ export default function Map({ className = '' }: MapProps) {
         map.current.on('mouseleave', 'unclustered-point', () => {
             map.current!.getCanvas().style.cursor = '';
         });
-    }, [filteredData]);
+    }, [filteredGeoJSONData]);
 
     return (
         <div
@@ -343,203 +388,201 @@ export default function Map({ className = '' }: MapProps) {
                     }}
                     onClick={(e) => e.stopPropagation()}
                 >
-                <div className="flex justify-between items-center mb-4">
-                    <div>
-                        <h2 className="text-xl font-bold text-gray-800">保育園検索</h2>
-                        <p className="text-sm text-gray-600 mt-1">
-                            検索結果: <span className="font-semibold text-blue-600">{filteredData.length.toLocaleString('ja-JP')}</span>件
-                        </p>
+                    <div className="flex justify-between items-center mb-4">
+                        <div>
+                            <h2 className="text-xl font-bold text-gray-800">保育園検索</h2>
+                            <p className="text-sm text-gray-600 mt-1">
+                                検索結果: <span className="font-semibold text-blue-600">{filteredGeoJSONData?.features.length.toLocaleString('ja-JP') || 0}</span>件
+                            </p>
+                        </div>
+                        <button
+                            onClick={() => setIsFilterPanelOpen(false)}
+                            className="text-gray-500 hover:text-gray-700 p-1 rounded-md hover:bg-gray-100 transition-colors duration-150 cursor-pointer"
+                            aria-label="フィルターパネルを閉じる"
+                        >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
                     </div>
-                    <button
-                        onClick={() => setIsFilterPanelOpen(false)}
-                        className="text-gray-500 hover:text-gray-700 p-1 rounded-md hover:bg-gray-100 transition-colors duration-150 cursor-pointer"
-                        aria-label="フィルターパネルを閉じる"
-                    >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </button>
-                </div>
 
-                {/* 保育園名検索（最重要） */}
-                <div className="mb-6">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                        保育園名で検索
-                        <span className="text-xs text-gray-500 ml-1">（部分一致）</span>
-                    </label>
-                    <input
-                        type="text"
-                        value={filters.searchQuery}
-                        onChange={(e) => setFilters(prev => ({ ...prev, searchQuery: e.target.value }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        placeholder="例: 横浜市馬場保育園"
-                    />
-                </div>
+                    {/* 保育園名検索（最重要） */}
+                    <div className="mb-6">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            保育園名で検索
+                            <span className="text-xs text-gray-500 ml-1">（部分一致）</span>
+                        </label>
+                        <input
+                            type="text"
+                            value={filters.searchQuery}
+                            onChange={(e) => setFilters(prev => ({ ...prev, searchQuery: e.target.value }))}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            placeholder="例: 横浜市馬場保育園"
+                        />
+                    </div>
 
-                {/* 年齢クラスと空き数のセット */}
-                <div className="mb-6">
-                    <label className="block text-sm font-medium text-gray-700 mb-3">
-                        年齢クラスと空き数
-                        <span className="text-xs text-gray-500 ml-1">（複数設定可能）</span>
-                    </label>
+                    {/* 年齢クラスと空き数のセット */}
+                    <div className="mb-6">
+                        <label className="block text-sm font-medium text-gray-700 mb-3">
+                            年齢クラスと空き数
+                            <span className="text-xs text-gray-500 ml-1">（複数設定可能）</span>
+                        </label>
 
-                    {filters.ageFilters.map((ageFilter, index) => (
-                        <div key={index} className="mb-4 p-3 border border-gray-200 rounded-md bg-gray-50">
-                            <div className="flex items-center justify-between mb-2">
-                                <span className="text-sm font-medium text-gray-700">条件 {index + 1}</span>
-                                <button
-                                    onClick={() => setFilters(prev => ({
-                                        ...prev,
-                                        ageFilters: prev.ageFilters.filter((_, i) => i !== index)
-                                    }))}
-                                    className="text-red-500 hover:text-red-700 p-1 rounded transition-colors"
-                                    aria-label="条件を削除"
-                                >
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                    </svg>
-                                </button>
-                            </div>
-
-                            <div className="grid grid-cols-1 gap-3">
-                                <div>
-                                    <label className="block text-xs text-gray-600 mb-1">年齢クラス</label>
-                                    <select
-                                        value={ageFilter.ageClass}
-                                        onChange={(e) => setFilters(prev => ({
+                        {filters.ageFilters.map((ageFilter, index) => (
+                            <div key={index} className="mb-4 p-3 border border-gray-200 rounded-md bg-gray-50">
+                                <div className="flex items-center justify-between mb-2">
+                                    <span className="text-sm font-medium text-gray-700">条件 {index + 1}</span>
+                                    <button
+                                        onClick={() => setFilters(prev => ({
                                             ...prev,
-                                            ageFilters: prev.ageFilters.map((filter, i) =>
-                                                i === index ? { ...filter, ageClass: e.target.value } : filter
-                                            )
+                                            ageFilters: prev.ageFilters.filter((_, i) => i !== index)
                                         }))}
-                                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                        className="text-red-500 hover:text-red-700 p-1 rounded transition-colors"
+                                        aria-label="条件を削除"
                                     >
-                                        {!filters.ageFilters.some((filter, i) => i !== index && filter.ageClass === '0歳児') && (
-                                            <option value="0歳児">0歳児</option>
-                                        )}
-                                        {!filters.ageFilters.some((filter, i) => i !== index && filter.ageClass === '1歳児') && (
-                                            <option value="1歳児">1歳児</option>
-                                        )}
-                                        {!filters.ageFilters.some((filter, i) => i !== index && filter.ageClass === '2歳児') && (
-                                            <option value="2歳児">2歳児</option>
-                                        )}
-                                        {!filters.ageFilters.some((filter, i) => i !== index && filter.ageClass === '3歳児') && (
-                                            <option value="3歳児">3歳児</option>
-                                        )}
-                                        {!filters.ageFilters.some((filter, i) => i !== index && filter.ageClass === '4歳児') && (
-                                            <option value="4歳児">4歳児</option>
-                                        )}
-                                        {!filters.ageFilters.some((filter, i) => i !== index && filter.ageClass === '5歳児') && (
-                                            <option value="5歳児">5歳児</option>
-                                        )}
-                                    </select>
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                    </button>
                                 </div>
 
-                                <div>
-                                    <label className="block text-xs text-gray-600 mb-1">空き数</label>
-                                    <div className="flex items-stretch">
-                                        <button
-                                            type="button"
-                                            onClick={() => setFilters(prev => ({
-                                                ...prev,
-                                                ageFilters: prev.ageFilters.map((filter, i) => {
-                                                    if (i !== index) return filter;
-                                                    const next = Math.max(1, (filter.minAvailableCount || 1) - 1);
-                                                    return { ...filter, minAvailableCount: next };
-                                                })
-                                            }))}
-                                            className="px-3 py-1 border border-gray-300 rounded-l text-gray-700 bg-white active:bg-gray-50"
-                                            aria-label="空き数を減らす"
-                                        >
-                                            −
-                                        </button>
-                                        <input
-                                            type="number"
-                                            inputMode="numeric"
-                                            min={1}
-                                            value={Math.max(1, ageFilter.minAvailableCount || 1)}
+                                <div className="grid grid-cols-1 gap-3">
+                                    <div>
+                                        <label className="block text-xs text-gray-600 mb-1">年齢クラス</label>
+                                        <select
+                                            value={ageFilter.ageClass}
                                             onChange={(e) => setFilters(prev => ({
                                                 ...prev,
                                                 ageFilters: prev.ageFilters.map((filter, i) =>
-                                                    i === index ? { ...filter, minAvailableCount: Math.max(1, parseInt(e.target.value) || 1) } : filter
+                                                    i === index ? { ...filter, ageClass: e.target.value } : filter
                                                 )
                                             }))}
-                                            className="w-full max-w-[6rem] text-center px-2 py-1 border-t border-b border-gray-300 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                            placeholder="1"
-                                        />
-                                        <button
-                                            type="button"
-                                            onClick={() => setFilters(prev => ({
-                                                ...prev,
-                                                ageFilters: prev.ageFilters.map((filter, i) => {
-                                                    if (i !== index) return filter;
-                                                    const next = (filter.minAvailableCount || 1) + 1;
-                                                    return { ...filter, minAvailableCount: next };
-                                                })
-                                            }))}
-                                            className="px-3 py-1 border border-gray-300 rounded-r text-gray-700 bg-white active:bg-gray-50"
-                                            aria-label="空き数を増やす"
+                                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
                                         >
-                                            ＋
-                                        </button>
-                                        <div className="ml-2 flex items-center text-xs text-gray-500">人以上</div>
+                                            {!filters.ageFilters.some((filter, i) => i !== index && filter.ageClass === '0歳児') && (
+                                                <option value="0歳児">0歳児</option>
+                                            )}
+                                            {!filters.ageFilters.some((filter, i) => i !== index && filter.ageClass === '1歳児') && (
+                                                <option value="1歳児">1歳児</option>
+                                            )}
+                                            {!filters.ageFilters.some((filter, i) => i !== index && filter.ageClass === '2歳児') && (
+                                                <option value="2歳児">2歳児</option>
+                                            )}
+                                            {!filters.ageFilters.some((filter, i) => i !== index && filter.ageClass === '3歳児') && (
+                                                <option value="3歳児">3歳児</option>
+                                            )}
+                                            {!filters.ageFilters.some((filter, i) => i !== index && filter.ageClass === '4歳児') && (
+                                                <option value="4歳児">4歳児</option>
+                                            )}
+                                            {!filters.ageFilters.some((filter, i) => i !== index && filter.ageClass === '5歳児') && (
+                                                <option value="5歳児">5歳児</option>
+                                            )}
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-xs text-gray-600 mb-1">空き数</label>
+                                        <div className="flex items-stretch">
+                                            <button
+                                                type="button"
+                                                onClick={() => setFilters(prev => ({
+                                                    ...prev,
+                                                    ageFilters: prev.ageFilters.map((filter, i) => {
+                                                        if (i !== index) return filter;
+                                                        const next = Math.max(1, (filter.minAvailableCount || 1) - 1);
+                                                        return { ...filter, minAvailableCount: next };
+                                                    })
+                                                }))}
+                                                className="px-3 py-1 border border-gray-300 rounded-l text-gray-700 bg-white active:bg-gray-50"
+                                                aria-label="空き数を減らす"
+                                            >
+                                                −
+                                            </button>
+                                            <input
+                                                type="number"
+                                                inputMode="numeric"
+                                                min={1}
+                                                value={Math.max(1, ageFilter.minAvailableCount || 1)}
+                                                onChange={(e) => setFilters(prev => ({
+                                                    ...prev,
+                                                    ageFilters: prev.ageFilters.map((filter, i) =>
+                                                        i === index ? { ...filter, minAvailableCount: Math.max(1, parseInt(e.target.value) || 1) } : filter
+                                                    )
+                                                }))}
+                                                className="w-full max-w-[6rem] text-center px-2 py-1 border-t border-b border-gray-300 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                                placeholder="1"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => setFilters(prev => ({
+                                                    ...prev,
+                                                    ageFilters: prev.ageFilters.map((filter, i) => {
+                                                        if (i !== index) return filter;
+                                                        const next = (filter.minAvailableCount || 1) + 1;
+                                                        return { ...filter, minAvailableCount: next };
+                                                    })
+                                                }))}
+                                                className="px-3 py-1 border border-gray-300 rounded-r text-gray-700 bg-white active:bg-gray-50"
+                                                aria-label="空き数を増やす"
+                                            >
+                                                ＋
+                                            </button>
+                                            <div className="ml-2 flex items-center text-xs text-gray-500">人以上</div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
-                    ))}
+                        ))}
 
-                    {/* 条件追加ボタン */}
-                    {(() => {
-                        const allAgeClasses = ['0歳児', '1歳児', '2歳児', '3歳児', '4歳児', '5歳児'];
-                        const usedAgeClasses = filters.ageFilters.map(filter => filter.ageClass);
-                        const availableAgeClasses = allAgeClasses.filter(ageClass => !usedAgeClasses.includes(ageClass));
+                        {/* 条件追加ボタン */}
+                        {(() => {
+                            const allAgeClasses = ['0歳児', '1歳児', '2歳児', '3歳児', '4歳児', '5歳児'];
+                            const usedAgeClasses = filters.ageFilters.map(filter => filter.ageClass);
+                            const availableAgeClasses = allAgeClasses.filter(ageClass => !usedAgeClasses.includes(ageClass));
 
-                        return availableAgeClasses.length > 0 && (
-                            <button
-                                onClick={() => setFilters(prev => ({
-                                    ...prev,
-                                    ageFilters: [...prev.ageFilters, { ageClass: availableAgeClasses[0], minAvailableCount: 1 }]
-                                }))}
-                                className="w-full px-3 py-2 border-2 border-dashed border-gray-300 rounded-md text-gray-600 hover:border-blue-400 hover:text-blue-600 transition-colors flex items-center justify-center"
-                            >
-                                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                                </svg>
-                                条件を追加
-                            </button>
-                        );
-                    })()}
-                </div>
+                            return availableAgeClasses.length > 0 && (
+                                <button
+                                    onClick={() => setFilters(prev => ({
+                                        ...prev,
+                                        ageFilters: [...prev.ageFilters, { ageClass: availableAgeClasses[0], minAvailableCount: 1 }]
+                                    }))}
+                                    className="w-full px-3 py-2 border-2 border-dashed border-gray-300 rounded-md text-gray-600 hover:border-blue-400 hover:text-blue-600 transition-colors flex items-center justify-center"
+                                >
+                                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                    </svg>
+                                    条件を追加
+                                </button>
+                            );
+                        })()}
+                    </div>
 
-                {/* フィルターリセット */}
-                <button
-                    onClick={() => setFilters({
-                        searchQuery: '',
-                        ageFilters: []
-                    })}
-                    className="w-full px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors cursor-pointer"
-                >
-                    検索条件をリセット
-                </button>
+                    {/* フィルターリセット */}
+                    <button
+                        onClick={() => setFilters({
+                            searchQuery: '',
+                            ageFilters: []
+                        })}
+                        className="w-full px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors cursor-pointer"
+                    >
+                        検索条件をリセット
+                    </button>
                 </div>
             </div>
 
             {/* フィルターパネル開閉ボタン */}
-            {!isFilterPanelOpen && (
-                <button
-                    onClick={() => setIsFilterPanelOpen(true)}
-                    className="absolute top-20 left-4 z-10 bg-white rounded-lg shadow-2xl p-3 hover:bg-gray-50 transition-colors duration-150 cursor-pointer"
-                    style={{
-                        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.05)'
-                    }}
-                    aria-label="フィルターパネルを開く"
-                >
-                    <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
-                </button>
-            )}
+            <button
+                onClick={() => setIsFilterPanelOpen(!isFilterPanelOpen)}
+                className="absolute top-20 left-4 z-10 bg-white rounded-lg shadow-2xl p-3 hover:bg-gray-50 transition-colors duration-150 cursor-pointer"
+                style={{
+                    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.05)'
+                }}
+                aria-label={isFilterPanelOpen ? "フィルターパネルを閉じる" : "フィルターパネルを開く"}
+            >
+                <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+            </button>
 
             {/* 保育園詳細モーダル */}
             <div
@@ -578,24 +621,32 @@ export default function Map({ className = '' }: MapProps) {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {selectedPreschool.stats.map((stat, index) => {
-                                        return (
-                                            <tr key={index} className="hover:bg-gray-50">
-                                                <td className="border border-gray-300 px-3 py-2 text-sm font-medium text-gray-800">
-                                                    {stat.age_class}
-                                                </td>
-                                                <td className="border border-gray-300 px-3 py-2 text-center text-sm text-gray-600 font-semibold">
-                                                    {stat.children_count}人
-                                                </td>
-                                                <td className="border border-gray-300 px-3 py-2 text-center text-sm text-gray-600 font-semibold">
-                                                    {stat.acceptance_count}人
-                                                </td>
-                                                <td className="border border-gray-300 px-3 py-2 text-center text-sm text-gray-600 font-semibold">
-                                                    {stat.waiting_count}人
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
+                                    {Array.isArray(selectedPreschool.stats) && selectedPreschool.stats.length > 0 ? (
+                                        selectedPreschool.stats.map((stat, index) => {
+                                            return (
+                                                <tr key={index} className="hover:bg-gray-50">
+                                                    <td className="border border-gray-300 px-3 py-2 text-sm font-medium text-gray-800">
+                                                        {stat.age_class}
+                                                    </td>
+                                                    <td className="border border-gray-300 px-3 py-2 text-center text-sm text-gray-600 font-semibold">
+                                                        {stat.children_count}人
+                                                    </td>
+                                                    <td className="border border-gray-300 px-3 py-2 text-center text-sm text-gray-600 font-semibold">
+                                                        {stat.acceptance_count}人
+                                                    </td>
+                                                    <td className="border border-gray-300 px-3 py-2 text-center text-sm text-gray-600 font-semibold">
+                                                        {stat.waiting_count}人
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })
+                                    ) : (
+                                        <tr>
+                                            <td colSpan={4} className="border border-gray-300 px-3 py-4 text-center text-sm text-gray-500">
+                                                データがありません
+                                            </td>
+                                        </tr>
+                                    )}
                                 </tbody>
                             </table>
                         </div>
