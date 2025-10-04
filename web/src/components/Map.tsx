@@ -34,15 +34,10 @@ interface FilterOptions {
 async function fetchData() {
     try {
         const response = await fetch('/api/preschool-data');
-
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
-
-        const data = await response.json();
-        console.log('データを取得しました:', data);
-        return data;
-
+        return await response.json();
     } catch (error) {
         console.error("データの取得に失敗しました:", error);
         throw error;
@@ -105,68 +100,10 @@ export default function Map({ className = '' }: MapProps) {
         });
     }, []);
 
-    // クラスターの境界を計算する関数
-    const calculateBounds = useCallback((data: PreschoolData[]) => {
-        if (data.length === 0) return null;
-        
-const bounds = data.reduce<[[number, number], [number, number]]>((acc, { coordinates }) => {
-    const [lng, lat] = coordinates;
-    return [
-        [Math.min(acc[0][0], lng), Math.min(acc[0][1], lat)],
-        [Math.max(acc[1][0], lng), Math.max(acc[1][1], lat)],
-    ];
-}, [
-    [data[0].coordinates[0], data[0].coordinates[1]],
-    [data[0].coordinates[0], data[0].coordinates[1]],
-]);
-        
-        return bounds;
-    }, []);
-
-    // 地図をクラスターの位置に移動する関数
-    const moveMapToClusters = useCallback(() => {
-        if (!map.current || !map.current.isStyleLoaded() || filteredData.length === 0) return;
-
-        // マップのレンダリングが完了したタイミングで実行
-        map.current.once('idle', () => {
-            if (!map.current) return;
-
-            const bounds = calculateBounds(filteredData);
-            if (bounds) {
-                // 現在のビューポートの境界を取得
-                const currentBounds = map.current.getBounds();
-                const currentSouthWest = currentBounds.getSouthWest();
-                const currentNorthEast = currentBounds.getNorthEast();
-                
-                // クラスターの境界が現在のビューポート内にあるかチェック
-                const isClusterInViewport = 
-                    bounds[0][0] >= currentSouthWest.lng && 
-                    bounds[0][1] >= currentSouthWest.lat &&
-                    bounds[1][0] <= currentNorthEast.lng && 
-                    bounds[1][1] <= currentNorthEast.lat;
-
-                // クラスターが画面外の場合は地図を移動
-                if (!isClusterInViewport) {
-                    map.current.fitBounds(bounds, { 
-                        padding: 50,
-                        maxZoom: 15 // 最大ズームレベルを制限
-                    });
-                }
-            }
-        });
-    }, [filteredData, calculateBounds]);
-
     useEffect(() => {
         const filtered = applyFilters(allData, filters);
         setFilteredData(filtered);
     }, [allData, filters, applyFilters]);
-
-    // 検索結果が更新された時に地図をクラスター位置に移動
-    useEffect(() => {
-        if (filteredData.length > 0) {
-            moveMapToClusters();
-        }
-    }, [filteredData, moveMapToClusters]);
 
     // iOS Safariのビューポート高さ問題を解決
     useEffect(() => {
@@ -182,7 +119,7 @@ const bounds = data.reduce<[[number, number], [number, number]]>((acc, { coordin
 
         // 初期化
         updateViewportHeight();
-        
+
         // イベントリスナーを追加
         window.addEventListener('resize', debouncedUpdate, { passive: true });
         window.addEventListener('orientationchange', updateViewportHeight, { passive: true });
@@ -202,27 +139,15 @@ const bounds = data.reduce<[[number, number], [number, number]]>((acc, { coordin
                 map.current = new maplibregl.Map({
                     container: mapContainer.current,
                     style: 'https://tiles.openfreemap.org/styles/bright',
-                    center: [139.6380, 35.4437],
-                    zoom: 12,
-                    pitch: 45, // 45度の傾斜角を設定（0度が真上から、60度が最大）
+                    center: [139.634, 35.450], // 横浜市役所
+                    zoom: 15,
+                    pitch: 53, // 45度の傾斜角を設定（0度が真上から、60度が最大）
                     bearing: 0, // 方位角（0度が北向き）
                     renderWorldCopies: false
                 });
 
                 map.current.on('load', async () => {
                     try {
-                        const kanagawaBounds: [[number, number], [number, number]] = [
-                            [139.0, 35.1],
-                            [139.9, 35.65]
-                        ];
-                        map.current!.fitBounds(kanagawaBounds, { padding: 20 });
-                        map.current!.setMaxBounds(kanagawaBounds);
-                        const allowedSlightlyWiderMinZoom = Math.max(0, map.current!.getZoom() - 0.7);
-                        map.current!.setMinZoom(allowedSlightlyWiderMinZoom);
-
-                        const uchidachoCenter: [number, number] = [139.631317, 35.453254];
-                        map.current!.setCenter(uchidachoCenter);
-
                         await loadData();
                     } catch (error) {
                         console.error('マップの初期化中にエラーが発生しました:', error);
@@ -250,7 +175,6 @@ const bounds = data.reduce<[[number, number], [number, number]]>((acc, { coordin
     useEffect(() => {
         if (!map.current || !map.current.isStyleLoaded()) return;
 
-        // 既存のレイヤーとソースを安全に削除
         try {
             if (map.current.getLayer('clusters')) {
                 map.current.removeLayer('clusters');
@@ -399,7 +323,7 @@ const bounds = data.reduce<[[number, number], [number, number]]>((acc, { coordin
     }, [filteredData]);
 
     return (
-        <div 
+        <div
             className={`relative w-full h-full ${className}`}
         >
             {/* タイトル */}
