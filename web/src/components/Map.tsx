@@ -186,15 +186,15 @@ export default function Map({ className = '' }: MapProps) {
                     container: mapContainer.current,
                     style: 'https://tiles.openfreemap.org/styles/bright',
                     center: [139.634, 35.450], // 横浜市役所
-                    zoom: 15,
-                    pitch: 53, // 45度の傾斜角を設定（0度が真上から、60度が最大）
-                    bearing: 0, // 方位角（0度が北向き）
+                    fadeDuration: 0,
+                    zoom: 12,
+                    pitch: 0,
+                    bearing: 0,
                     renderWorldCopies: false,
-                    // 地図の表示を早くするための設定
                     maxZoom: 18,
                     minZoom: 10,
-                    // 地図の読み込みを最適化
-                    attributionControl: false
+                    attributionControl: false,
+                    localIdeographFontFamily: "'Noto Sans CJK JP','Hiragino Kaku Gothic ProN','sans-serif'",
                 });
 
                 map.current.on('load', () => {
