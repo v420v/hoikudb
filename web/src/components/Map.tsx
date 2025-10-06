@@ -79,6 +79,7 @@ export default function Map({ className = '' }: MapProps) {
     const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
     const [viewportHeight, setViewportHeight] = useState('100vh');
     const [isLoading, setIsLoading] = useState(true);
+    const scrollContainerRef = useRef<HTMLDivElement>(null);
 
     const loadData = useCallback(async () => {
         try {
@@ -193,7 +194,10 @@ export default function Map({ className = '' }: MapProps) {
                     renderWorldCopies: false,
                     maxZoom: 18,
                     minZoom: 10,
-                    attributionControl: false,
+                    attributionControl: {
+                        compact: true,
+                        customAttribution: '© OpenStreetMap contributors'
+                    },
                     localIdeographFontFamily: "'Noto Sans CJK JP','Hiragino Kaku Gothic ProN','sans-serif'",
                 });
 
@@ -221,6 +225,49 @@ export default function Map({ className = '' }: MapProps) {
             }
         };
     }, [loadData]);
+
+    // グローバルイベントでフィルターパネルを開く（フッターのアイランドボタンから起動）
+    useEffect(() => {
+        const openHandler = () => {
+            // 検索（フィルターパネル）を開く際は詳細モーダルを閉じる
+            setSelectedPreschool(null);
+            setIsFilterPanelOpen(true);
+            // オーバーレイ状態通知
+            try {
+                const ev = new CustomEvent('overlayState', { detail: { anyOpen: true, type: 'filter' } });
+                window.dispatchEvent(ev as any);
+            } catch {}
+        };
+        // 型の都合上、イベント名を any 経由で登録
+        window.addEventListener('openFilterPanel' as any, openHandler as any);
+        return () => {
+            window.removeEventListener('openFilterPanel' as any, openHandler as any);
+        };
+    }, []);
+
+    // isFilterPanelOpen / selectedPreschool の変更を監視してフッターへ状態通知
+    useEffect(() => {
+        const anyOpen = !!isFilterPanelOpen || !!selectedPreschool;
+        try {
+            const ev = new CustomEvent('overlayState', { detail: { anyOpen, type: isFilterPanelOpen ? 'filter' : (selectedPreschool ? 'detail' : 'none') } });
+            window.dispatchEvent(ev as any);
+        } catch {}
+    }, [isFilterPanelOpen, selectedPreschool]);
+
+    // 条件追加時に自動スクロール
+    useEffect(() => {
+        if (filters.ageFilters.length > 0 && scrollContainerRef.current) {
+            // 少し遅延させてDOM更新後にスクロール
+            setTimeout(() => {
+                if (scrollContainerRef.current) {
+                    scrollContainerRef.current.scrollTo({
+                        top: scrollContainerRef.current.scrollHeight,
+                        behavior: 'smooth'
+                    });
+                }
+            }, 100);
+        }
+    }, [filters.ageFilters.length]);
 
     useEffect(() => {
         if (!map.current || !map.current.isStyleLoaded()) return;
@@ -339,6 +386,12 @@ export default function Map({ className = '' }: MapProps) {
                 const properties = features[0].properties;
                 const geometry = features[0].geometry as GeoJSON.Point;
                 if (geometry.type === 'Point') {
+                    // 詳細を開く際は検索（フィルターパネル）を閉じる
+                    setIsFilterPanelOpen(false);
+                    try {
+                        const ev = new CustomEvent('overlayState', { detail: { anyOpen: true, type: 'detail' } });
+                        window.dispatchEvent(ev as any);
+                    } catch {}
                     let stats = [];
                     if (typeof properties.stats === 'string') {
                         try {
@@ -399,18 +452,24 @@ export default function Map({ className = '' }: MapProps) {
             )}
             {/* フィルターパネル */}
             <div
-                className={`fixed inset-0 z-10 flex items-center justify-center p-4 ${isFilterPanelOpen ? 'pointer-events-auto' : 'pointer-events-none'} transition-opacity duration-300 ${isFilterPanelOpen ? 'opacity-100' : 'opacity-0'}`}
+                className={`fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 ${isFilterPanelOpen ? 'pointer-events-auto' : 'pointer-events-none'} transition-opacity duration-300 ${isFilterPanelOpen ? 'opacity-100' : 'opacity-0'}`}
                 onClick={() => setIsFilterPanelOpen(false)}
             >
                 <div
-                    className="bg-white rounded-lg shadow-2xl p-4 sm:p-6 w-72 sm:w-80 max-h-[calc(var(--app-vh)-6rem)] overflow-y-auto"
+                    className="w-full sm:w-80 bg-white border border-gray-200 rounded-t-2xl sm:rounded-2xl shadow-2xl max-h-[calc(var(--app-vh)-2rem)] sm:max-h-[calc(var(--app-vh)-6rem)] overflow-hidden"
                     style={{
                         boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.05)',
                         animation: isFilterPanelOpen ? 'slideUpFromCenter 300ms cubic-bezier(0.16, 1, 0.3, 1)' : undefined
                     }}
                     onClick={(e) => e.stopPropagation()}
                 >
-                    <div className="flex justify-between items-center mb-4">
+                    {/* グリッパー */}
+                    <div className="sm:hidden flex justify-center pt-2 pb-1">
+                        <div className="w-10 h-1.5 rounded-full bg-gray-300" />
+                    </div>
+
+                    {/* ヘッダー */}
+                    <div className="sticky top-0 z-10 bg-white border-b border-gray-100 px-4 py-3 sm:px-6 sm:py-4 flex justify-between items-center">
                         <div>
                             <h2 className="text-xl font-bold text-gray-800">保育園検索</h2>
                             <p className="text-sm text-gray-600 mt-1">
@@ -419,7 +478,7 @@ export default function Map({ className = '' }: MapProps) {
                         </div>
                         <button
                             onClick={() => setIsFilterPanelOpen(false)}
-                            className="text-gray-500 hover:text-gray-700 p-1 rounded-md hover:bg-gray-100 transition-colors duration-150 cursor-pointer"
+                            className="text-gray-500 hover:text-gray-700 p-2 rounded-md hover:bg-gray-100 transition-colors duration-150 cursor-pointer"
                             aria-label="フィルターパネルを閉じる"
                         >
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -428,6 +487,8 @@ export default function Map({ className = '' }: MapProps) {
                         </button>
                     </div>
 
+                    {/* スクロール領域 */}
+                    <div ref={scrollContainerRef} className="px-4 sm:px-6 pt-4 pb-4 sm:pb-6 overflow-y-auto" style={{ maxHeight: 'calc(var(--app-vh) - 240px)' }}>
                     {/* 保育園名検索（最重要） */}
                     <div className="mb-6">
                         <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -438,7 +499,7 @@ export default function Map({ className = '' }: MapProps) {
                             type="text"
                             value={filters.searchQuery}
                             onChange={(e) => setFilters(prev => ({ ...prev, searchQuery: e.target.value }))}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full px-3 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                             placeholder="例: 横浜市馬場保育園"
                         />
                     </div>
@@ -479,7 +540,7 @@ export default function Map({ className = '' }: MapProps) {
                                                     i === index ? { ...filter, ageClass: e.target.value } : filter
                                                 )
                                             }))}
-                                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
                                         >
                                             {!filters.ageFilters.some((filter, i) => i !== index && filter.ageClass === '0歳児') && (
                                                 <option value="0歳児">0歳児</option>
@@ -515,7 +576,7 @@ export default function Map({ className = '' }: MapProps) {
                                                         return { ...filter, minAvailableCount: next };
                                                     })
                                                 }))}
-                                                className="px-3 py-1 border border-gray-300 rounded-l text-gray-700 bg-white active:bg-gray-50"
+                                                className="px-4 py-2 border border-gray-300 rounded-l text-gray-700 bg-white active:bg-gray-50"
                                                 aria-label="空き数を減らす"
                                             >
                                                 −
@@ -531,7 +592,7 @@ export default function Map({ className = '' }: MapProps) {
                                                         i === index ? { ...filter, minAvailableCount: Math.max(1, parseInt(e.target.value) || 1) } : filter
                                                     )
                                                 }))}
-                                                className="w-full max-w-[6rem] text-center px-2 py-1 border-t border-b border-gray-300 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                                className="w-full max-w-[6rem] text-center px-3 py-2 border-t border-b border-gray-300 focus:outline-none focus:ring-1 focus:ring-blue-500"
                                                 placeholder="1"
                                             />
                                             <button
@@ -544,7 +605,7 @@ export default function Map({ className = '' }: MapProps) {
                                                         return { ...filter, minAvailableCount: next };
                                                     })
                                                 }))}
-                                                className="px-3 py-1 border border-gray-300 rounded-r text-gray-700 bg-white active:bg-gray-50"
+                                                className="px-4 py-2 border border-gray-300 rounded-r text-gray-700 bg-white active:bg-gray-50"
                                                 aria-label="空き数を増やす"
                                             >
                                                 ＋
@@ -579,44 +640,38 @@ export default function Map({ className = '' }: MapProps) {
                         })()}
                     </div>
 
-                    {/* フィルターリセット */}
-                    <button
-                        onClick={() => setFilters({
-                            searchQuery: '',
-                            ageFilters: []
-                        })}
-                        className="w-full px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors cursor-pointer"
-                    >
-                        検索条件をリセット
-                    </button>
+                    {/* 余白確保（フッター浮かせる） */}
+                    <div className="h-12 sm:h-0" />
+                    </div>
+
+                    {/* フッターアクション */}
+                    <div className="sticky bottom-0 bg-white border-t border-gray-100 px-4 py-3 sm:px-6 sm:py-4 flex gap-3">
+                        <button
+                            onClick={() => setFilters({ searchQuery: '', ageFilters: [] })}
+                            className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors cursor-pointer text-sm font-medium"
+                        >
+                            リセット
+                        </button>
+                        <button
+                            onClick={() => setIsFilterPanelOpen(false)}
+                            className="flex-1 px-4 py-3 bg-gray-800 text-white rounded-lg hover:bg-black transition-colors cursor-pointer text-sm font-medium"
+                        >
+                            閉じる
+                        </button>
+                    </div>
                 </div>
             </div>
 
-            {/* フィルターパネル開閉ボタン */}
-            {!isLoading && (
-                <button
-                    onClick={() => setIsFilterPanelOpen(!isFilterPanelOpen)}
-                    className="absolute right-2.5 z-10 bg-white rounded-lg shadow-2xl p-3 hover:bg-gray-50 transition-colors duration-150 cursor-pointer"
-                    style={{
-                        top: '120px',
-                        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.05)'
-                    }}
-                    aria-label={isFilterPanelOpen ? "フィルターパネルを閉じる" : "フィルターパネルを開く"}
-                >
-                    <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
-                </button>
-            )}
+            {/* 右上の検索ボタンはアイランドへ統合したため削除 */}
 
             {/* 保育園詳細モーダル */}
             <div
-                className={`fixed inset-0 z-20 flex items-center justify-center p-4 ${selectedPreschool ? 'pointer-events-auto' : 'pointer-events-none'} transition-opacity duration-300 ${selectedPreschool ? 'opacity-100' : 'opacity-0'}`}
+                className={`fixed inset-0 z-50 flex items-center justify-center p-4 ${selectedPreschool ? 'pointer-events-auto' : 'pointer-events-none'} transition-opacity duration-300 ${selectedPreschool ? 'opacity-100' : 'opacity-0'}`}
                 onClick={() => setSelectedPreschool(null)}
             >
                 {selectedPreschool && (
                     <div
-                        className="bg-white rounded-lg shadow-2xl p-4 sm:p-6 w-80 sm:w-96 max-h-[80vh] overflow-y-auto pointer-events-auto transform transition-transform duration-200 ease-out"
+                        className="bg-white border border-gray-200 rounded-2xl shadow-2xl p-4 sm:p-6 w-80 sm:w-96 max-h-[80vh] overflow-y-auto pointer-events-auto transform transition-transform duration-200 ease-out"
                         style={{
                             boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.05)',
                             animation: 'slideUpFromCenter 300ms cubic-bezier(0.16, 1, 0.3, 1)'

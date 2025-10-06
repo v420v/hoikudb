@@ -1,90 +1,107 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 
 export default function Footer() {
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isSourceOpen, setIsSourceOpen] = useState(false);
+  const [isHiddenByOverlay, setIsHiddenByOverlay] = useState(false);
+  const popoverRef = useRef<HTMLDivElement | null>(null);
+
+  const handleSearchClick = () => {
+    const event = new Event('openFilterPanel');
+    window.dispatchEvent(event);
+  };
+
+  // ポップオーバー外クリックで閉じる
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (!isSourceOpen) return;
+      const target = e.target as Node;
+      if (popoverRef.current && !popoverRef.current.contains(target)) {
+        setIsSourceOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside, { passive: true } as any);
+    return () => document.removeEventListener('mousedown', handleClickOutside as any);
+  }, [isSourceOpen]);
+
+  // オーバーレイ（検索/詳細）が開いている間はアイランドを隠す
+  useEffect(() => {
+    const handler = (e: any) => {
+      if (!e?.detail) return;
+      setIsHiddenByOverlay(!!e.detail.anyOpen);
+      if (e.detail.anyOpen) {
+        setIsSourceOpen(false);
+      }
+    };
+    window.addEventListener('overlayState' as any, handler as any);
+    return () => window.removeEventListener('overlayState' as any, handler as any);
+  }, []);
 
   return (
-    <footer className="bg-white border-t border-gray-200 shadow-lg flex-shrink-0">
-      <div className="max-w-7xl mx-auto px-4">
-        {/* コンパクト表示 */}
-        <div className="py-2 sm:py-3">
-          <div className="flex items-center justify-between">
-            {/* データ出典概要 */}
-            <div className="flex-1 text-center px-2">
-              <p className="text-xs text-gray-600 leading-tight">
-                データ出典: 
-                <a 
-                  href="https://www.city.yokohama.lg.jp/kosodate-kyoiku/hoiku-yoji/shisetsu/riyou/info/nyusho-jokyo.html"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-600 hover:text-blue-800 underline ml-1"
-                >
-                  横浜市
-                </a>
-                <span className="text-gray-400"> (CC BY 4.0)</span>
-              </p>
-            </div>
-            
-            {/* 詳細表示ボタン */}
-            <button
-              onClick={() => setIsExpanded(!isExpanded)}
-              className="text-gray-500 hover:text-gray-700 transition-colors duration-200 flex items-center space-x-1 flex-shrink-0 ml-2"
-              aria-label={isExpanded ? '詳細を閉じる' : '詳細を表示'}
-            >
-              <span className="text-xs hidden sm:inline">詳細</span>
-              <svg 
-                className={`w-4 h-4 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} 
-                fill="none" 
-                stroke="currentColor" 
-                viewBox="0 0 24 24"
+    <div className={`pointer-events-none fixed inset-x-0 bottom-15 z-30 flex justify-center transition-opacity duration-200 ${isHiddenByOverlay ? 'opacity-0' : 'opacity-100'}`}>
+      <div className="pointer-events-auto relative">
+        {/* アイランド本体 */}
+        <div className="flex items-center gap-2 px-3 py-2 sm:px-5 sm:py-3 rounded-full bg-white text-gray-800 shadow-2xl border border-gray-200"
+          style={{ boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25), 0 0 0 1px rgba(0,0,0,0.05)' }}
+        >
+          {/* 検索ボタン（メインCTA） */}
+          <button
+            onClick={handleSearchClick}
+            className="inline-flex items-center gap-2 px-3 sm:px-4 py-2 rounded-full bg-white text-gray-800 border border-gray-200 hover:bg-gray-50 active:scale-[0.98] transition"
+            aria-label="検索条件を開く"
+          >
+            <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <span className="text-sm font-semibold">検索する</span>
+          </button>
+
+          {/* 情報ボタン（出典） */}
+          <button
+            onClick={() => setIsSourceOpen((v) => !v)}
+            className="inline-flex items-center justify-center w-9 h-9 rounded-full border border-gray-200 text-gray-700 hover:bg-gray-50"
+            aria-expanded={isSourceOpen}
+            aria-controls="source-popover"
+            aria-label="データ出典情報を表示"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20 10 10 0 000-20z" />
+            </svg>
+          </button>
+        </div>
+
+        {/* 出典ポップオーバー */}
+        {isSourceOpen && (
+          <div
+            id="source-popover"
+            ref={popoverRef}
+            className="absolute bottom-[calc(100%+10px)] left-1/2 -translate-x-1/2 bg-white border border-gray-200 rounded-lg shadow-2xl w-[280px] sm:w-[360px] p-3"
+            style={{ boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25), 0 0 0 1px rgba(0,0,0,0.05)' }}
+            role="dialog"
+            aria-label="データ出典情報"
+          >
+            <p className="text-xs text-gray-700 leading-relaxed">
+              データ出典:
+              <a
+                href="https://www.city.yokohama.lg.jp/kosodate-kyoiku/hoiku-yoji/shisetsu/riyou/info/nyusho-jokyo.html"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 hover:text-blue-800 underline ml-1"
               >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
+                横浜市
+              </a>
+              <span className="text-gray-400 ml-1">(CC BY 4.0)</span>
+            </p>
+            <p className="mt-2 text-xs text-gray-600">
+              本サービス「ほいぷら」は上記公開データを基に一部加工して利用しています。
+            </p>
+            <p className="mt-2 text-[11px] text-gray-500">
+              ※本サービスは横浜市の公式サイトではなく、横浜市による保証・後援を受けていません。
+            </p>
           </div>
-        </div>
-        
-        {/* 詳細表示（折りたたみ） */}
-        <div className={`overflow-hidden transition-all duration-300 ${isExpanded ? 'max-h-80 opacity-100' : 'max-h-0 opacity-0'}`}>
-          <div className="border-t border-gray-100 py-3 sm:py-4">
-            <div className="text-left sm:text-center max-w-4xl mx-auto px-2">
-              <div className="space-y-2 sm:space-y-3">
-                <p className="text-xs sm:text-sm text-gray-600 leading-relaxed">
-                  本サービス「ほいぷら」は、横浜市の公開データ
-                  <a 
-                    href="https://www.city.yokohama.lg.jp/kosodate-kyoiku/hoiku-yoji/shisetsu/riyou/info/nyusho-jokyo.html"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-600 hover:text-blue-800 underline mx-1"
-                  >
-                    保育所等の入所状況
-                  </a>
-                  を基に一部加工して利用しています。
-                </p>
-                
-                <p className="text-xs sm:text-sm text-gray-600 leading-relaxed">
-                  元データは
-                  <a 
-                    href="https://creativecommons.org/licenses/by/4.0/deed.ja"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-600 hover:text-blue-800 underline mx-1"
-                  >
-                    CC BY 4.0
-                  </a>
-                  ライセンスの下で提供されています。
-                </p>
-                
-                <p className="text-xs text-gray-500 leading-relaxed">
-                  ※本サービスは横浜市の公式サイトではなく、横浜市による保証・後援を受けているものではありません。
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
+        )}
       </div>
-    </footer>
+    </div>
   );
 }
