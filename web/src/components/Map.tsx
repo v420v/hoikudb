@@ -55,7 +55,7 @@ interface FilterOptions {
 
 async function fetchData() {
     try {
-        const response = await fetch('/api/preschool-data');
+        const response = await fetch('/geojson/latest.geojson');
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
