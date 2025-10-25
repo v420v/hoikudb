@@ -12,6 +12,11 @@ export default function Footer() {
     window.dispatchEvent(event);
   };
 
+  const handleWardClick = () => {
+    const event = new Event('openWardPanel');
+    window.dispatchEvent(event);
+  };
+
   // ポップオーバー外クリックで閉じる
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -45,16 +50,29 @@ export default function Footer() {
         <div className="flex items-center gap-2 px-3 py-2 sm:px-5 sm:py-3 rounded-full bg-white text-gray-800 shadow-2xl border border-gray-200"
           style={{ boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25), 0 0 0 1px rgba(0,0,0,0.05)' }}
         >
-          {/* 検索ボタン（メインCTA） */}
+          {/* 区別ボタン */}
+          <button
+            onClick={handleWardClick}
+            className="inline-flex items-center gap-2 px-3 sm:px-4 py-2 rounded-full bg-white text-gray-800 border border-gray-200 hover:bg-gray-50 active:scale-[0.98] transition"
+            aria-label="区別で絞り込み"
+          >
+            <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            <span className="text-sm font-semibold">区別</span>
+          </button>
+
+          {/* 表示条件ボタン（メインCTA） */}
           <button
             onClick={handleSearchClick}
             className="inline-flex items-center gap-2 px-3 sm:px-4 py-2 rounded-full bg-white text-gray-800 border border-gray-200 hover:bg-gray-50 active:scale-[0.98] transition"
-            aria-label="検索条件を開く"
+            aria-label="表示条件を開く"
           >
             <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
             </svg>
-            <span className="text-sm font-semibold">検索する</span>
+            <span className="text-sm font-semibold">表示条件</span>
           </button>
 
           {/* 情報ボタン（出典） */}

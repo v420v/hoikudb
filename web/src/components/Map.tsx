@@ -12,10 +12,13 @@ interface PreschoolData {
     id: number;
     name: string;
     stats: Array<{
-        age_class: string;
-        acceptance_count: number;
-        children_count: number;
-        waiting_count: number;
+        kind: 'waiting' | 'children' | 'acceptance';
+        zero_year_old: number;
+        one_year_old: number;
+        two_year_old: number;
+        three_year_old: number;
+        four_year_old: number;
+        five_year_old: number;
     }>;
     coordinates: [number, number];
 }
@@ -26,10 +29,13 @@ interface GeoJSONFeature {
         id: number;
         name: string;
         stats: Array<{
-            age_class: string;
-            acceptance_count: number;
-            children_count: number;
-            waiting_count: number;
+            kind: 'waiting' | 'children' | 'acceptance';
+            zero_year_old: number;
+            one_year_old: number;
+            two_year_old: number;
+            three_year_old: number;
+            four_year_old: number;
+            five_year_old: number;
         }>;
     };
     geometry: {
@@ -53,15 +59,56 @@ interface FilterOptions {
     ageFilters: AgeFilter[];
 }
 
-async function fetchData() {
+// データキャッシュ用の型
+interface CachedData {
+    data: GeoJSONData;
+    timestamp: number;
+}
+
+// データキャッシュ（メモリ内）
+const dataCache: { [key: string]: CachedData } = {};
+const CACHE_DURATION = 5 * 60 * 1000; // 5分間キャッシュ
+
+async function fetchDataFromAPI(area: string): Promise<GeoJSONData> {
     try {
-        const response = await fetch('/geojson/latest.geojson');
+        console.log(`APIからデータを取得中: ${area}`);
+        const response = await fetch(`https://localhost/preschool/stats?area=${encodeURIComponent(area)}`);
+        console.log('APIレスポンス:', response.status, response.statusText);
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
-        return await response.json();
+        const data = await response.json();
+        console.log('APIから取得したデータ:', data);
+        return data;
     } catch (error) {
-        console.error("データの取得に失敗しました:", error);
+        console.error(`APIからのデータ取得に失敗しました (${area}):`, error);
+        throw error;
+    }
+}
+
+async function fetchData(area: string): Promise<GeoJSONData> {
+    // キャッシュをチェック
+    const cached = dataCache[area];
+    const now = Date.now();
+    
+    if (cached && (now - cached.timestamp) < CACHE_DURATION) {
+        console.log(`キャッシュからデータを取得: ${area}`);
+        return cached.data;
+    }
+
+    try {
+        console.log(`APIからデータを取得: ${area}`);
+        const data = await fetchDataFromAPI(area);
+        
+        // キャッシュに保存
+        dataCache[area] = {
+            data,
+            timestamp: now
+        };
+        
+        return data;
+    } catch (error) {
+        console.error(`データの取得に失敗しました (${area}):`, error);
         throw error;
     }
 }
@@ -80,15 +127,124 @@ export default function Map({ className = '' }: MapProps) {
     const [viewportHeight, setViewportHeight] = useState('100vh');
     const [isLoading, setIsLoading] = useState(true);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
+    const [currentDistrict, setCurrentDistrict] = useState('');
+    const [apiError, setApiError] = useState<string | null>(null);
+    const [selectedWard, setSelectedWard] = useState<string | null>(null);
+    const [isWardPanelOpen, setIsWardPanelOpen] = useState(false);
+
+    // 横浜市の各区の座標範囲を定義
+    //const getDistrictFromCoordinates = useCallback((lng: number, lat: number): string => {
+    //    // 横浜市の各区の大まかな座標範囲
+    //    const districts = [
+    //        { name: '鶴見区',   bounds: { minLng: 139.65, maxLng: 139.75, minLat: 35.50, maxLat: 35.55 } },
+    //        { name: '神奈川区', bounds: { minLng: 139.62, maxLng: 139.70, minLat: 35.45, maxLat: 35.50 } },
+    //        { name: '西区',     bounds: { minLng: 139.61, maxLng: 139.65, minLat: 35.45, maxLat: 35.50 } },
+    //        { name: '中区',     bounds: { minLng: 139.63, maxLng: 139.70, minLat: 35.44, maxLat: 35.48 } },
+    //        { name: '南区',     bounds: { minLng: 139.62, maxLng: 139.70, minLat: 35.40, maxLat: 35.45 } },
+    //        { name: '港北区',   bounds: { minLng: 139.55, maxLng: 139.65, minLat: 35.50, maxLat: 35.60 } },
+    //        { name: '都筑区',   bounds: { minLng: 139.55, maxLng: 139.65, minLat: 35.55, maxLat: 35.65 } },
+    //        { name: '青葉区',   bounds: { minLng: 139.45, maxLng: 139.55, minLat: 35.55, maxLat: 35.65 } },
+    //        { name: '緑区',     bounds: { minLng: 139.40, maxLng: 139.50, minLat: 35.50, maxLat: 35.60 } },
+    //        { name: '旭区',     bounds: { minLng: 139.52, maxLng: 139.62, minLat: 35.45, maxLat: 35.55 } },
+    //        { name: '瀬谷区',   bounds: { minLng: 139.40, maxLng: 139.50, minLat: 35.40, maxLat: 35.50 } },
+    //        { name: '泉区',     bounds: { minLng: 139.45, maxLng: 139.55, minLat: 35.35, maxLat: 35.45 } },
+    //        { name: '戸塚区',   bounds: { minLng: 139.40, maxLng: 139.55, minLat: 35.35, maxLat: 35.45 } },
+    //        { name: '栄区',     bounds: { minLng: 139.40, maxLng: 139.50, minLat: 35.30, maxLat: 35.40 } },
+    //        { name: '港南区',   bounds: { minLng: 139.60, maxLng: 139.70, minLat: 35.35, maxLat: 35.45 } },
+    //        { name: '保土ケ谷区',bounds: { minLng:139.57, maxLng:139.65, minLat:35.40, maxLat:35.50 } },
+    //        { name: '金沢区',   bounds: { minLng: 139.60, maxLng: 139.75, minLat: 35.25, maxLat: 35.35 } },
+    //        { name: '磯子区',   bounds: { minLng: 139.60, maxLng: 139.70, minLat: 35.30, maxLat: 35.40 } }
+    //    ];
+//
+//        for (const district of districts) {
+//            if (lng >= district.bounds.minLng && lng <= district.bounds.maxLng &&
+//                lat >= district.bounds.minLat && lat <= district.bounds.maxLat) {
+//                return district.name;
+//            }
+//        }
+//        return '範囲外';
+//    }, []);
+
+    // 区別の座標範囲を取得する関数
+    const getDistrictBounds = useCallback((district: string) => {
+        const districts = [
+            { name: '鶴見区',   bounds: { minLng: 139.65, maxLng: 139.75, minLat: 35.50, maxLat: 35.55 } },
+            { name: '神奈川区', bounds: { minLng: 139.62, maxLng: 139.70, minLat: 35.45, maxLat: 35.50 } },
+            { name: '西区',     bounds: { minLng: 139.61, maxLng: 139.65, minLat: 35.45, maxLat: 35.50 } },
+            { name: '中区',     bounds: { minLng: 139.63, maxLng: 139.70, minLat: 35.44, maxLat: 35.48 } },
+            { name: '南区',     bounds: { minLng: 139.62, maxLng: 139.70, minLat: 35.40, maxLat: 35.45 } },
+            { name: '港北区',   bounds: { minLng: 139.55, maxLng: 139.65, minLat: 35.50, maxLat: 35.60 } },
+            { name: '都筑区',   bounds: { minLng: 139.55, maxLng: 139.65, minLat: 35.55, maxLat: 35.65 } },
+            { name: '青葉区',   bounds: { minLng: 139.45, maxLng: 139.55, minLat: 35.55, maxLat: 35.65 } },
+            { name: '緑区',     bounds: { minLng: 139.40, maxLng: 139.50, minLat: 35.50, maxLat: 35.60 } },
+            { name: '旭区',     bounds: { minLng: 139.52, maxLng: 139.62, minLat: 35.45, maxLat: 35.55 } },
+            { name: '瀬谷区',   bounds: { minLng: 139.40, maxLng: 139.50, minLat: 35.40, maxLat: 35.50 } },
+            { name: '泉区',     bounds: { minLng: 139.45, maxLng: 139.55, minLat: 35.35, maxLat: 35.45 } },
+            { name: '戸塚区',   bounds: { minLng: 139.40, maxLng: 139.55, minLat: 35.35, maxLat: 35.45 } },
+            { name: '栄区',     bounds: { minLng: 139.40, maxLng: 139.50, minLat: 35.30, maxLat: 35.40 } },
+            { name: '港南区',   bounds: { minLng: 139.60, maxLng: 139.70, minLat: 35.35, maxLat: 35.45 } },
+            { name: '保土ケ谷区',bounds: { minLng:139.57, maxLng:139.65, minLat:35.40, maxLat:35.50 } },
+            { name: '金沢区',   bounds: { minLng: 139.60, maxLng: 139.75, minLat: 35.25, maxLat: 35.35 } },
+            { name: '磯子区',   bounds: { minLng: 139.60, maxLng: 139.70, minLat: 35.30, maxLat: 35.40 } }
+        ];
+
+        const foundDistrict = districts.find(d => d.name === district);
+        if (!foundDistrict) return null;
+
+        return [
+            [foundDistrict.bounds.minLng, foundDistrict.bounds.minLat],
+            [foundDistrict.bounds.maxLng, foundDistrict.bounds.maxLat]
+        ] as [[number, number], [number, number]];
+    }, []);
+
+    // 選択された区に地図を移動する関数
+    const moveToDistrict = useCallback((district: string) => {
+        if (!map.current) return;
+
+        const bounds = getDistrictBounds(district);
+        if (bounds) {
+            map.current.fitBounds(bounds, {
+                padding: 50,
+                maxZoom: 16
+            });
+        }
+    }, [getDistrictBounds]);
 
     const loadData = useCallback(async () => {
+        // 初期データとして横浜市全体のデータを取得（フォールバック用）
         try {
             setIsLoading(true);
-            const geoJSONData = await fetchData();
+            setApiError(null);
+            console.log('データを取得中...');
+            const geoJSONData = await fetchData('横浜市');
+            console.log('取得したデータ:', geoJSONData);
+            console.log('フィーチャー数:', geoJSONData.features.length);
             setAllGeoJSONData(geoJSONData);
             setFilteredGeoJSONData(geoJSONData);
         } catch (error) {
-            console.error('データの取得に失敗しました:', error);
+            console.error('初期データの取得に失敗しました:', error);
+            setApiError('データの取得に失敗しました。ページを再読み込みしてください。');
+        } finally {
+            setIsLoading(false);
+        }
+    }, []);
+
+    // 区別のデータを取得する関数
+    const loadDataForWard = useCallback(async (ward: string) => {
+        try {
+            setIsLoading(true);
+            setApiError(null);
+            console.log(`区別データを取得中: ${ward}`);
+            const geoJSONData = await fetchData(ward);
+            console.log('取得した区別データ:', geoJSONData);
+            console.log('フィーチャー数:', geoJSONData.features.length);
+            
+            // 区別データを直接設定
+            setAllGeoJSONData(geoJSONData);
+            setFilteredGeoJSONData(geoJSONData);
+        } catch (error) {
+            console.error(`区別データの取得に失敗しました (${ward}):`, error);
+            setApiError(`${ward}のデータ取得に失敗しました。しばらくしてから再試行してください。`);
         } finally {
             setIsLoading(false);
         }
@@ -123,13 +279,30 @@ export default function Map({ className = '' }: MapProps) {
             if (filterOptions.ageFilters.length > 0) {
                 for (const ageFilter of filterOptions.ageFilters) {
                     const requiredMin = Math.max(1, ageFilter.minAvailableCount || 1);
-                    const matchingStat = preschool.stats.find((stat: any) =>
-                        stat.age_class === ageFilter.ageClass
-                    );
-                    if (!matchingStat) {
+                    
+                    // 新しい構造から年齢クラスに対応するデータを取得
+                    const ageClassMap: { [key: string]: string } = {
+                        '0歳児': 'zero_year_old',
+                        '1歳児': 'one_year_old',
+                        '2歳児': 'two_year_old',
+                        '3歳児': 'three_year_old',
+                        '4歳児': 'four_year_old',
+                        '5歳児': 'five_year_old'
+                    };
+                    
+                    const ageField = ageClassMap[ageFilter.ageClass];
+                    if (!ageField) {
                         return false;
                     }
-                    const availableCount = Math.max(0, (matchingStat?.acceptance_count ?? 0) - (matchingStat?.waiting_count ?? 0));
+                    
+                    // acceptance_countとwaiting_countを計算
+                    const acceptanceStat = preschool.stats.find((stat: any) => stat.kind === 'acceptance');
+                    const waitingStat = preschool.stats.find((stat: any) => stat.kind === 'waiting');
+                    
+                    const acceptanceCount = acceptanceStat?.[ageField as keyof typeof acceptanceStat] ?? 0;
+                    const waitingCount = waitingStat?.[ageField as keyof typeof waitingStat] ?? 0;
+                    const availableCount = Math.max(0, acceptanceCount - waitingCount);
+                    
                     if (availableCount < requiredMin) {
                         return false;
                     }
@@ -188,12 +361,16 @@ export default function Map({ className = '' }: MapProps) {
                     style: 'https://tiles.openfreemap.org/styles/bright',
                     center: [139.634, 35.450], // 横浜市役所
                     fadeDuration: 0,
-                    zoom: 12,
+                    zoom: 15, // 横浜市全体が見えるようにズームレベルを調整
                     pitch: 0,
                     bearing: 0,
                     renderWorldCopies: false,
                     maxZoom: 18,
-                    minZoom: 10,
+                    minZoom: 7, // 横浜市全体が映るように最小ズームを調整
+                    maxBounds: [
+                        [139.4, 35.25], // 西南角（西経139.4度、北緯35.25度）
+                        [139.8, 35.65]  // 東北角（東経139.8度、北緯35.65度）
+                    ], // 横浜市の地理的境界を設定（より厳密に制限）
                     attributionControl: {
                         compact: true,
                         customAttribution: '© OpenStreetMap contributors'
@@ -213,6 +390,15 @@ export default function Map({ className = '' }: MapProps) {
                 });
 
                 map.current.addControl(new maplibregl.NavigationControl(), 'top-right');
+
+                // 地図の移動時に区名を更新（データの自動読み込みは削除）
+                //map.current.on('moveend', () => {
+                //    if (map.current) {
+                //        const center = map.current.getCenter();
+                //        const district = getDistrictFromCoordinates(center.lng, center.lat);
+                //        setCurrentDistrict(district);
+                //    }
+                //});
             } catch (error) {
                 console.error('マップの作成中にエラーが発生しました:', error);
             }
@@ -245,14 +431,36 @@ export default function Map({ className = '' }: MapProps) {
         };
     }, []);
 
-    // isFilterPanelOpen / selectedPreschool の変更を監視してフッターへ状態通知
+    // グローバルイベントで区別パネルを開く
     useEffect(() => {
-        const anyOpen = !!isFilterPanelOpen || !!selectedPreschool;
+        const openWardHandler = () => {
+            setSelectedPreschool(null);
+            setIsFilterPanelOpen(false);
+            setIsWardPanelOpen(true);
+            try {
+                const ev = new CustomEvent('overlayState', { detail: { anyOpen: true, type: 'ward' } });
+                window.dispatchEvent(ev as any);
+            } catch {}
+        };
+        window.addEventListener('openWardPanel' as any, openWardHandler as any);
+        return () => {
+            window.removeEventListener('openWardPanel' as any, openWardHandler as any);
+        };
+    }, []);
+
+    // isFilterPanelOpen / selectedPreschool / isWardPanelOpen の変更を監視してフッターへ状態通知
+    useEffect(() => {
+        const anyOpen = !!isFilterPanelOpen || !!selectedPreschool || !!isWardPanelOpen;
         try {
-            const ev = new CustomEvent('overlayState', { detail: { anyOpen, type: isFilterPanelOpen ? 'filter' : (selectedPreschool ? 'detail' : 'none') } });
+            const ev = new CustomEvent('overlayState', { 
+                detail: { 
+                    anyOpen, 
+                    type: isFilterPanelOpen ? 'filter' : (isWardPanelOpen ? 'ward' : (selectedPreschool ? 'detail' : 'none')) 
+                } 
+            });
             window.dispatchEvent(ev as any);
         } catch {}
-    }, [isFilterPanelOpen, selectedPreschool]);
+    }, [isFilterPanelOpen, selectedPreschool, isWardPanelOpen]);
 
     // 条件追加時に自動スクロール
     useEffect(() => {
@@ -270,7 +478,14 @@ export default function Map({ className = '' }: MapProps) {
     }, [filters.ageFilters.length]);
 
     useEffect(() => {
-        if (!map.current || !map.current.isStyleLoaded()) return;
+        if (!map.current || !map.current.isStyleLoaded()) {
+            console.log('マップが準備できていません');
+            return;
+        }
+
+        console.log('クラスター表示を更新中...');
+        console.log('filteredGeoJSONData:', filteredGeoJSONData);
+        console.log('フィーチャー数:', filteredGeoJSONData?.features.length);
 
         try {
             if (map.current.getLayer('clusters')) {
@@ -289,7 +504,10 @@ export default function Map({ className = '' }: MapProps) {
             console.warn('レイヤーまたはソースの削除中にエラーが発生しました:', error);
         }
 
-        if (!filteredGeoJSONData) return;
+        if (!filteredGeoJSONData) {
+            console.log('filteredGeoJSONDataがありません');
+            return;
+        }
 
         map.current.addSource('preschools', {
             type: 'geojson',
@@ -432,10 +650,34 @@ export default function Map({ className = '' }: MapProps) {
         <div
             className={`relative w-full h-full ${className}`}
         >
-            {/* タイトル */}
-            <div className="absolute top-4 left-4 z-30 rounded-lg px-0 py-4">
-                <h1 className="text-3xl font-bold text-gray-800 tracking-wide">ほいぷら</h1>
-            </div>
+            {/* 区名表示（フィルターがかかっている場合のみ） */}
+            {selectedWard && (
+                <div className="absolute top-4 left-4 z-30 rounded-lg px-4 py-3 bg-white/90 backdrop-blur-sm shadow-lg border border-gray-200">
+                    <h1 className="text-xl font-bold text-gray-800 tracking-wide" id="district-name">
+                        {selectedWard}
+                    </h1>
+                    <button
+                        onClick={() => {
+                            setSelectedWard(null);
+                            // 横浜市全体のデータを取得
+                            loadData();
+                            // 地図を横浜市全体に戻す
+                            if (map.current) {
+                                map.current.fitBounds([
+                                    [139.4, 35.25],
+                                    [139.8, 35.65]
+                                ], {
+                                    padding: 50,
+                                    maxZoom: 15
+                                });
+                            }
+                        }}
+                        className="text-sm text-blue-600 hover:text-blue-800 mt-1 underline"
+                    >
+                        フィルターを解除
+                    </button>
+                </div>
+            )}
 
             {/* ローディング表示 */}
             {isLoading && (
@@ -450,6 +692,127 @@ export default function Map({ className = '' }: MapProps) {
                     <span className="text-sm font-medium text-gray-700">データを読み込み中...</span>
                 </div>
             )}
+
+            {/* エラー表示 */}
+            {apiError && (
+                <div 
+                    className="absolute right-2.5 z-30 bg-red-50 border border-red-200 rounded-lg shadow-2xl px-4 py-3 max-w-sm"
+                    style={{
+                        top: '120px',
+                        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.05)'
+                    }}
+                >
+                    <div className="flex items-start">
+                        <svg className="w-5 h-5 text-red-500 mr-2 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <div>
+                            <p className="text-sm font-medium text-red-800">エラー</p>
+                            <p className="text-xs text-red-600 mt-1">{apiError}</p>
+                            <button
+                                onClick={() => setApiError(null)}
+                                className="text-xs text-red-500 hover:text-red-700 mt-2 underline"
+                            >
+                                閉じる
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* 区別パネル */}
+            <div
+                className={`fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 ${isWardPanelOpen ? 'pointer-events-auto' : 'pointer-events-none'} transition-opacity duration-300 ${isWardPanelOpen ? 'opacity-100' : 'opacity-0'}`}
+                onClick={() => setIsWardPanelOpen(false)}
+            >
+                <div
+                    className="w-full sm:w-96 bg-white border border-gray-200 rounded-t-2xl sm:rounded-2xl shadow-2xl max-h-[calc(var(--app-vh)-2rem)] sm:max-h-[calc(var(--app-vh)-6rem)] overflow-hidden"
+                    style={{
+                        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.05)',
+                        animation: isWardPanelOpen ? 'slideUpFromCenter 300ms cubic-bezier(0.16, 1, 0.3, 1)' : undefined
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    {/* グリッパー */}
+                    <div className="sm:hidden flex justify-center pt-2 pb-1">
+                        <div className="w-10 h-1.5 rounded-full bg-gray-300" />
+                    </div>
+
+                    {/* ヘッダー */}
+                    <div className="sticky top-0 z-10 bg-white border-b border-gray-100 px-4 py-3 sm:px-6 sm:py-4 flex justify-between items-center">
+                        <div>
+                            <h2 className="text-xl font-bold text-gray-800">区別で絞り込み</h2>
+                            <p className="text-sm text-gray-600 mt-1">
+                                横浜市の区を選択してください
+                            </p>
+                        </div>
+                        <button
+                            onClick={() => setIsWardPanelOpen(false)}
+                            className="text-gray-500 hover:text-gray-700 p-2 rounded-md hover:bg-gray-100 transition-colors duration-150 cursor-pointer"
+                            aria-label="区別パネルを閉じる"
+                        >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+
+                    {/* 区別ボタン */}
+                    <div className="px-4 sm:px-6 py-4 overflow-y-auto" style={{ maxHeight: 'calc(var(--app-vh) - 200px)' }}>
+                        <div className="grid grid-cols-2 gap-3">
+                            {[
+                                '鶴見区', '神奈川区', '西区', '中区', '南区', '港北区',
+                                '都筑区', '青葉区', '緑区', '旭区', '瀬谷区', '泉区',
+                                '戸塚区', '栄区', '港南区', '保土ケ谷区', '金沢区', '磯子区'
+                            ].map((ward) => (
+                                <button
+                                    key={ward}
+                                    onClick={() => {
+                                        setSelectedWard(ward);
+                                        setIsWardPanelOpen(false);
+                                        // 選択された区のデータを取得
+                                        loadDataForWard(ward);
+                                        // 地図を選択された区に移動
+                                        moveToDistrict(ward);
+                                    }}
+                                    className={`px-4 py-3 rounded-lg border-2 transition-all duration-200 ${
+                                        selectedWard === ward
+                                            ? 'border-blue-500 bg-blue-50 text-blue-700 font-semibold'
+                                            : 'border-gray-200 bg-white text-gray-700 hover:border-blue-300 hover:bg-blue-50'
+                                    }`}
+                                >
+                                    {ward}
+                                </button>
+                            ))}
+                        </div>
+                        
+                        {/* 全解除ボタン */}
+                        <div className="mt-4 pt-4 border-t border-gray-200">
+                            <button
+                                onClick={() => {
+                                    setSelectedWard(null);
+                                    setIsWardPanelOpen(false);
+                                    // 横浜市全体のデータを取得
+                                    loadData();
+                                    // 地図を横浜市全体に戻す
+                                    if (map.current) {
+                                        map.current.fitBounds([
+                                            [139.4, 35.25],
+                                            [139.8, 35.65]
+                                        ], {
+                                            padding: 50,
+                                            maxZoom: 15
+                                        });
+                                    }
+                                }}
+                                className="w-full px-4 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                            >
+                                フィルターを解除
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             {/* フィルターパネル */}
             <div
                 className={`fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 ${isFilterPanelOpen ? 'pointer-events-auto' : 'pointer-events-none'} transition-opacity duration-300 ${isFilterPanelOpen ? 'opacity-100' : 'opacity-0'}`}
@@ -471,9 +834,9 @@ export default function Map({ className = '' }: MapProps) {
                     {/* ヘッダー */}
                     <div className="sticky top-0 z-10 bg-white border-b border-gray-100 px-4 py-3 sm:px-6 sm:py-4 flex justify-between items-center">
                         <div>
-                            <h2 className="text-xl font-bold text-gray-800">保育園検索</h2>
+                            <h2 className="text-xl font-bold text-gray-800">表示条件</h2>
                             <p className="text-sm text-gray-600 mt-1">
-                                検索結果: <span className="font-semibold text-blue-600">{filteredGeoJSONData?.features.length.toLocaleString('ja-JP') || 0}</span>件
+                                表示件数: <span className="font-semibold text-blue-600">{filteredGeoJSONData?.features.length.toLocaleString('ja-JP') || 0}</span>件
                             </p>
                         </div>
                         <button
@@ -489,10 +852,10 @@ export default function Map({ className = '' }: MapProps) {
 
                     {/* スクロール領域 */}
                     <div ref={scrollContainerRef} className="px-4 sm:px-6 pt-4 pb-4 sm:pb-6 overflow-y-auto" style={{ maxHeight: 'calc(var(--app-vh) - 240px)' }}>
-                    {/* 保育園名検索（最重要） */}
+                    {/* 保育園名表示条件（最重要） */}
                     <div className="mb-6">
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                            保育園名で検索
+                            保育園名で絞り込み
                             <span className="text-xs text-gray-500 ml-1">（部分一致）</span>
                         </label>
                         <input
@@ -702,24 +1065,44 @@ export default function Map({ className = '' }: MapProps) {
                                 </thead>
                                 <tbody>
                                     {Array.isArray(selectedPreschool.stats) && selectedPreschool.stats.length > 0 ? (
-                                        selectedPreschool.stats.map((stat, index) => {
-                                            return (
-                                                <tr key={index} className="hover:bg-gray-50">
-                                                    <td className="border border-gray-300 px-3 py-2 text-sm font-medium text-gray-800">
-                                                        {stat.age_class}
-                                                    </td>
-                                                    <td className="border border-gray-300 px-3 py-2 text-center text-sm text-gray-600 font-semibold">
-                                                        {stat.children_count}人
-                                                    </td>
-                                                    <td className="border border-gray-300 px-3 py-2 text-center text-sm text-gray-600 font-semibold">
-                                                        {stat.acceptance_count}人
-                                                    </td>
-                                                    <td className="border border-gray-300 px-3 py-2 text-center text-sm text-gray-600 font-semibold">
-                                                        {stat.waiting_count}人
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })
+                                        (() => {
+                                            // 新しい構造から年齢クラス別のデータを生成
+                                            const ageClasses = [
+                                                { key: 'zero_year_old', label: '0歳児' },
+                                                { key: 'one_year_old', label: '1歳児' },
+                                                { key: 'two_year_old', label: '2歳児' },
+                                                { key: 'three_year_old', label: '3歳児' },
+                                                { key: 'four_year_old', label: '4歳児' },
+                                                { key: 'five_year_old', label: '5歳児' }
+                                            ];
+                                            
+                                            const childrenStat = selectedPreschool.stats.find(stat => stat.kind === 'children');
+                                            const acceptanceStat = selectedPreschool.stats.find(stat => stat.kind === 'acceptance');
+                                            const waitingStat = selectedPreschool.stats.find(stat => stat.kind === 'waiting');
+                                            
+                                            return ageClasses.map((ageClass, index) => {
+                                                const childrenCount = childrenStat?.[ageClass.key as keyof typeof childrenStat] ?? 0;
+                                                const acceptanceCount = acceptanceStat?.[ageClass.key as keyof typeof acceptanceStat] ?? 0;
+                                                const waitingCount = waitingStat?.[ageClass.key as keyof typeof waitingStat] ?? 0;
+                                                
+                                                return (
+                                                    <tr key={index} className="hover:bg-gray-50">
+                                                        <td className="border border-gray-300 px-3 py-2 text-sm font-medium text-gray-800">
+                                                            {ageClass.label}
+                                                        </td>
+                                                        <td className="border border-gray-300 px-3 py-2 text-center text-sm text-gray-600 font-semibold">
+                                                            {childrenCount}人
+                                                        </td>
+                                                        <td className="border border-gray-300 px-3 py-2 text-center text-sm text-gray-600 font-semibold">
+                                                            {acceptanceCount}人
+                                                        </td>
+                                                        <td className="border border-gray-300 px-3 py-2 text-center text-sm text-gray-600 font-semibold">
+                                                            {waitingCount}人
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            });
+                                        })()
                                     ) : (
                                         <tr>
                                             <td colSpan={4} className="border border-gray-300 px-3 py-4 text-center text-sm text-gray-500">

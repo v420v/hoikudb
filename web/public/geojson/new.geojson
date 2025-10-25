@@ -1,0 +1,55 @@
+{
+    "crs": {
+        "properties": {
+            "name": "EPSG:4326"
+        },
+        "type": "name"
+    },
+    "features": [
+        {
+            "geometry": {
+                "coordinates": [
+                    139.560835,
+                    35.578105,
+                    0
+                ],
+                "type": "Point"
+            },
+            "properties": {
+                "id": 860,
+                "name": "横浜市美しが丘保育園",
+                "stats": [
+                    {
+                        "five_year_old": 14,
+                        "four_year_old": 8,
+                        "kind": "waiting",
+                        "one_year_old": 0,
+                        "three_year_old": 3,
+                        "two_year_old": 2,
+                        "zero_year_old": 0
+                    },
+                    {
+                        "five_year_old": 17,
+                        "four_year_old": 21,
+                        "kind": "children",
+                        "one_year_old": 14,
+                        "three_year_old": 20,
+                        "two_year_old": 16,
+                        "zero_year_old": 6
+                    },
+                    {
+                        "five_year_old": 0,
+                        "four_year_old": 0,
+                        "kind": "acceptance",
+                        "one_year_old": 8,
+                        "three_year_old": 0,
+                        "two_year_old": 0,
+                        "zero_year_old": 13
+                    }
+                ]
+            },
+            "type": "Feature"
+        }
+    ],
+    "type": "FeatureCollection"
+}
