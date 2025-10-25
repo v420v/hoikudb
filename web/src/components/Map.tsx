@@ -13,6 +13,7 @@ interface PreschoolData {
     name: string;
     stats: Array<{
         kind: 'waiting' | 'children' | 'acceptance';
+        target_date: string;
         zero_year_old: number;
         one_year_old: number;
         two_year_old: number;
@@ -30,6 +31,7 @@ interface GeoJSONFeature {
         name: string;
         stats: Array<{
             kind: 'waiting' | 'children' | 'acceptance';
+            target_date: string;
             zero_year_old: number;
             one_year_old: number;
             two_year_old: number;
@@ -72,7 +74,8 @@ const CACHE_DURATION = 5 * 60 * 1000; // 5分間キャッシュ
 async function fetchDataFromAPI(area: string): Promise<GeoJSONData> {
     try {
         console.log(`APIからデータを取得中: ${area}`);
-        const response = await fetch(`https://localhost/preschool/stats?area=${encodeURIComponent(area)}`);
+        const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+        const response = await fetch(`${apiUrl}/preschool/stats?area=${encodeURIComponent(area)}`);
         console.log('APIレスポンス:', response.status, response.statusText);
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
@@ -127,43 +130,9 @@ export default function Map({ className = '' }: MapProps) {
     const [viewportHeight, setViewportHeight] = useState('100vh');
     const [isLoading, setIsLoading] = useState(true);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
-    const [currentDistrict, setCurrentDistrict] = useState('');
     const [apiError, setApiError] = useState<string | null>(null);
     const [selectedWard, setSelectedWard] = useState<string | null>(null);
-    const [isWardPanelOpen, setIsWardPanelOpen] = useState(false);
-
-    // 横浜市の各区の座標範囲を定義
-    //const getDistrictFromCoordinates = useCallback((lng: number, lat: number): string => {
-    //    // 横浜市の各区の大まかな座標範囲
-    //    const districts = [
-    //        { name: '鶴見区',   bounds: { minLng: 139.65, maxLng: 139.75, minLat: 35.50, maxLat: 35.55 } },
-    //        { name: '神奈川区', bounds: { minLng: 139.62, maxLng: 139.70, minLat: 35.45, maxLat: 35.50 } },
-    //        { name: '西区',     bounds: { minLng: 139.61, maxLng: 139.65, minLat: 35.45, maxLat: 35.50 } },
-    //        { name: '中区',     bounds: { minLng: 139.63, maxLng: 139.70, minLat: 35.44, maxLat: 35.48 } },
-    //        { name: '南区',     bounds: { minLng: 139.62, maxLng: 139.70, minLat: 35.40, maxLat: 35.45 } },
-    //        { name: '港北区',   bounds: { minLng: 139.55, maxLng: 139.65, minLat: 35.50, maxLat: 35.60 } },
-    //        { name: '都筑区',   bounds: { minLng: 139.55, maxLng: 139.65, minLat: 35.55, maxLat: 35.65 } },
-    //        { name: '青葉区',   bounds: { minLng: 139.45, maxLng: 139.55, minLat: 35.55, maxLat: 35.65 } },
-    //        { name: '緑区',     bounds: { minLng: 139.40, maxLng: 139.50, minLat: 35.50, maxLat: 35.60 } },
-    //        { name: '旭区',     bounds: { minLng: 139.52, maxLng: 139.62, minLat: 35.45, maxLat: 35.55 } },
-    //        { name: '瀬谷区',   bounds: { minLng: 139.40, maxLng: 139.50, minLat: 35.40, maxLat: 35.50 } },
-    //        { name: '泉区',     bounds: { minLng: 139.45, maxLng: 139.55, minLat: 35.35, maxLat: 35.45 } },
-    //        { name: '戸塚区',   bounds: { minLng: 139.40, maxLng: 139.55, minLat: 35.35, maxLat: 35.45 } },
-    //        { name: '栄区',     bounds: { minLng: 139.40, maxLng: 139.50, minLat: 35.30, maxLat: 35.40 } },
-    //        { name: '港南区',   bounds: { minLng: 139.60, maxLng: 139.70, minLat: 35.35, maxLat: 35.45 } },
-    //        { name: '保土ケ谷区',bounds: { minLng:139.57, maxLng:139.65, minLat:35.40, maxLat:35.50 } },
-    //        { name: '金沢区',   bounds: { minLng: 139.60, maxLng: 139.75, minLat: 35.25, maxLat: 35.35 } },
-    //        { name: '磯子区',   bounds: { minLng: 139.60, maxLng: 139.70, minLat: 35.30, maxLat: 35.40 } }
-    //    ];
-//
-//        for (const district of districts) {
-//            if (lng >= district.bounds.minLng && lng <= district.bounds.maxLng &&
-//                lat >= district.bounds.minLat && lat <= district.bounds.maxLat) {
-//                return district.name;
-//            }
-//        }
-//        return '範囲外';
-//    }, []);
+    const [isWardPanelOpen, setIsWardPanelOpen] = useState(true); // 初期状態で区別パネルを表示
 
     // 区別の座標範囲を取得する関数
     const getDistrictBounds = useCallback((district: string) => {
@@ -448,6 +417,17 @@ export default function Map({ className = '' }: MapProps) {
         };
     }, []);
 
+    // 区が選択されていない場合、区別パネルを強制表示
+    useEffect(() => {
+        if (!selectedWard && !isWardPanelOpen && !isFilterPanelOpen && !selectedPreschool) {
+            // 少し遅延させて他の処理が完了してから表示
+            const timer = setTimeout(() => {
+                setIsWardPanelOpen(true);
+            }, 100);
+            return () => clearTimeout(timer);
+        }
+    }, [selectedWard, isWardPanelOpen, isFilterPanelOpen, selectedPreschool]);
+
     // isFilterPanelOpen / selectedPreschool / isWardPanelOpen の変更を監視してフッターへ状態通知
     useEffect(() => {
         const anyOpen = !!isFilterPanelOpen || !!selectedPreschool || !!isWardPanelOpen;
@@ -652,30 +632,38 @@ export default function Map({ className = '' }: MapProps) {
         >
             {/* 区名表示（フィルターがかかっている場合のみ） */}
             {selectedWard && (
-                <div className="absolute top-4 left-4 z-30 rounded-lg px-4 py-3 bg-white/90 backdrop-blur-sm shadow-lg border border-gray-200">
-                    <h1 className="text-xl font-bold text-gray-800 tracking-wide" id="district-name">
-                        {selectedWard}
-                    </h1>
-                    <button
-                        onClick={() => {
-                            setSelectedWard(null);
-                            // 横浜市全体のデータを取得
-                            loadData();
-                            // 地図を横浜市全体に戻す
-                            if (map.current) {
-                                map.current.fitBounds([
-                                    [139.4, 35.25],
-                                    [139.8, 35.65]
-                                ], {
-                                    padding: 50,
-                                    maxZoom: 15
-                                });
-                            }
-                        }}
-                        className="text-sm text-blue-600 hover:text-blue-800 mt-1 underline"
-                    >
-                        フィルターを解除
-                    </button>
+                <div className="absolute top-4 left-4 z-30 rounded-xl px-4 py-3 bg-white/95 backdrop-blur-sm shadow-xl border border-gray-200">
+                    <div className="flex items-center justify-between gap-3">
+                        <div>
+                            <h1 className="text-xl font-bold text-gray-800 tracking-wide" id="district-name">
+                                {selectedWard}
+                            </h1>
+                            <p className="text-sm text-gray-600 mt-0.5">区別で絞り込み中</p>
+                        </div>
+                        <button
+                            onClick={() => {
+                                setSelectedWard(null);
+                                // 横浜市全体のデータを取得
+                                loadData();
+                                // 地図を横浜市全体に戻す
+                                if (map.current) {
+                                    map.current.fitBounds([
+                                        [139.4, 35.25],
+                                        [139.8, 35.65]
+                                    ], {
+                                        padding: 50,
+                                        maxZoom: 15
+                                    });
+                                }
+                            }}
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors duration-200 border border-gray-200 hover:border-gray-300"
+                        >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                            解除
+                        </button>
+                    </div>
                 </div>
             )}
 
@@ -722,7 +710,12 @@ export default function Map({ className = '' }: MapProps) {
             {/* 区別パネル */}
             <div
                 className={`fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 ${isWardPanelOpen ? 'pointer-events-auto' : 'pointer-events-none'} transition-opacity duration-300 ${isWardPanelOpen ? 'opacity-100' : 'opacity-0'}`}
-                onClick={() => setIsWardPanelOpen(false)}
+                onClick={() => {
+                    // 区が選択されている場合のみ閉じることを許可
+                    if (selectedWard) {
+                        setIsWardPanelOpen(false);
+                    }
+                }}
             >
                 <div
                     className="w-full sm:w-96 bg-white border border-gray-200 rounded-t-2xl sm:rounded-2xl shadow-2xl max-h-[calc(var(--app-vh)-2rem)] sm:max-h-[calc(var(--app-vh)-6rem)] overflow-hidden"
@@ -742,22 +735,30 @@ export default function Map({ className = '' }: MapProps) {
                         <div>
                             <h2 className="text-xl font-bold text-gray-800">区別で絞り込み</h2>
                             <p className="text-sm text-gray-600 mt-1">
-                                横浜市の区を選択してください
+                                {selectedWard 
+                                    ? "横浜市の区を選択してください" 
+                                    : "※ 区を選択してください（必須）"
+                                }
                             </p>
                         </div>
-                        <button
-                            onClick={() => setIsWardPanelOpen(false)}
-                            className="text-gray-500 hover:text-gray-700 p-2 rounded-md hover:bg-gray-100 transition-colors duration-150 cursor-pointer"
-                            aria-label="区別パネルを閉じる"
-                        >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                        </button>
+                        {selectedWard && (
+                            <button
+                                onClick={() => setIsWardPanelOpen(false)}
+                                className="text-gray-500 hover:text-gray-700 p-2 rounded-md hover:bg-gray-100 transition-colors duration-150 cursor-pointer"
+                                aria-label="区別パネルを閉じる"
+                            >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        )}
                     </div>
 
                     {/* 区別ボタン */}
                     <div className="px-4 sm:px-6 py-4 overflow-y-auto" style={{ maxHeight: 'calc(var(--app-vh) - 200px)' }}>
+                        <div className="text-lg font-bold text-gray-800 mb-2">
+                            横浜市
+                        </div>
                         <div className="grid grid-cols-2 gap-3">
                             {[
                                 '鶴見区', '神奈川区', '西区', '中区', '南区', '港北区',
@@ -783,31 +784,6 @@ export default function Map({ className = '' }: MapProps) {
                                     {ward}
                                 </button>
                             ))}
-                        </div>
-                        
-                        {/* 全解除ボタン */}
-                        <div className="mt-4 pt-4 border-t border-gray-200">
-                            <button
-                                onClick={() => {
-                                    setSelectedWard(null);
-                                    setIsWardPanelOpen(false);
-                                    // 横浜市全体のデータを取得
-                                    loadData();
-                                    // 地図を横浜市全体に戻す
-                                    if (map.current) {
-                                        map.current.fitBounds([
-                                            [139.4, 35.25],
-                                            [139.8, 35.65]
-                                        ], {
-                                            padding: 50,
-                                            maxZoom: 15
-                                        });
-                                    }
-                                }}
-                                className="w-full px-4 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
-                            >
-                                フィルターを解除
-                            </button>
                         </div>
                     </div>
                 </div>
@@ -1041,11 +1017,40 @@ export default function Map({ className = '' }: MapProps) {
                         }}
                         onClick={(e) => e.stopPropagation()}
                     >
-                        <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-xl font-bold text-gray-800">{selectedPreschool.name}</h3>
+                        <div className="flex justify-between items-start mb-4">
+                            <div className="flex-1">
+                                <h3 className="text-xl font-bold text-gray-800 mb-2">{selectedPreschool.name}</h3>
+                                {(() => {
+                                    // 最新のtarget_dateを取得
+                                    const latestStat = selectedPreschool.stats.find(stat => stat.target_date);
+                                    if (latestStat?.target_date) {
+                                        try {
+                                            // target_dateを適切な形式にフォーマット
+                                            const date = new Date(latestStat.target_date);
+                                            const formattedDate = date.toLocaleDateString('ja-JP', {
+                                                year: 'numeric',
+                                                month: 'long',
+                                                day: 'numeric'
+                                            });
+                                            return (
+                                                <div className="text-sm text-gray-600 bg-blue-50 px-3 py-1 rounded-md inline-block">
+                                                    <span className="font-medium">データ取得日:</span> {formattedDate}
+                                                </div>
+                                            );
+                                        } catch (error) {
+                                            return (
+                                                <div className="text-sm text-gray-600 bg-blue-50 px-3 py-1 rounded-md inline-block">
+                                                    <span className="font-medium">データ取得日:</span> {latestStat.target_date}
+                                                </div>
+                                            );
+                                        }
+                                    }
+                                    return null;
+                                })()}
+                            </div>
                             <button
                                 onClick={() => setSelectedPreschool(null)}
-                                className="text-gray-500 hover:text-gray-700 p-1 rounded-md hover:bg-gray-100 transition-colors cursor-pointer"
+                                className="text-gray-500 hover:text-gray-700 p-1 rounded-md hover:bg-gray-100 transition-colors cursor-pointer ml-4 flex-shrink-0"
                                 aria-label="モーダルを閉じる"
                             >
                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
