@@ -74,8 +74,7 @@ const CACHE_DURATION = 5 * 60 * 1000; // 5分間キャッシュ
 async function fetchDataFromAPI(area: string): Promise<GeoJSONData> {
     try {
         console.log(`APIからデータを取得中: ${area}`);
-        const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
-        const response = await fetch(`${apiUrl}/preschool/stats?area=${encodeURIComponent(area)}`);
+        const response = await fetch(`http://54.199.84.59/preschool/stats?area=${encodeURIComponent(area)}`);
         console.log('APIレスポンス:', response.status, response.statusText);
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
