@@ -136,24 +136,24 @@ export default function Map({ className = '' }: MapProps) {
     // 区別の座標範囲を取得する関数
     const getDistrictBounds = useCallback((district: string) => {
         const districts = [
-            { name: '鶴見区',   bounds: { minLng: 139.65, maxLng: 139.75, minLat: 35.50, maxLat: 35.55 } },
-            { name: '神奈川区', bounds: { minLng: 139.62, maxLng: 139.70, minLat: 35.45, maxLat: 35.50 } },
-            { name: '西区',     bounds: { minLng: 139.61, maxLng: 139.65, minLat: 35.45, maxLat: 35.50 } },
-            { name: '中区',     bounds: { minLng: 139.63, maxLng: 139.70, minLat: 35.44, maxLat: 35.48 } },
-            { name: '南区',     bounds: { minLng: 139.62, maxLng: 139.70, minLat: 35.40, maxLat: 35.45 } },
-            { name: '港北区',   bounds: { minLng: 139.55, maxLng: 139.65, minLat: 35.50, maxLat: 35.60 } },
+            { name: '鶴見区',   bounds: { minLng: 139.60, maxLng: 139.70, minLat: 35.50, maxLat: 35.55 } },
+            { name: '神奈川区', bounds: { minLng: 139.55, maxLng: 139.70, minLat: 35.45, maxLat: 35.50 } },
+            { name: '西区',     bounds: { minLng: 139.60, maxLng: 139.65, minLat: 35.43, maxLat: 35.50 } },
+            { name: '中区',     bounds: { minLng: 139.63, maxLng: 139.70, minLat: 35.44, maxLat: 35.43 } },
+            { name: '南区',     bounds: { minLng: 139.60, maxLng: 139.60, minLat: 35.40, maxLat: 35.45 } },
+            { name: '港北区',   bounds: { minLng: 139.55, maxLng: 139.67, minLat: 35.50, maxLat: 35.55 } },
             { name: '都筑区',   bounds: { minLng: 139.55, maxLng: 139.65, minLat: 35.55, maxLat: 35.65 } },
-            { name: '青葉区',   bounds: { minLng: 139.45, maxLng: 139.55, minLat: 35.55, maxLat: 35.65 } },
+            { name: '青葉区',   bounds: { minLng: 139.45, maxLng: 139.55, minLat: 35.50, maxLat: 35.65 } },
             { name: '緑区',     bounds: { minLng: 139.40, maxLng: 139.50, minLat: 35.50, maxLat: 35.60 } },
-            { name: '旭区',     bounds: { minLng: 139.52, maxLng: 139.62, minLat: 35.45, maxLat: 35.55 } },
-            { name: '瀬谷区',   bounds: { minLng: 139.40, maxLng: 139.50, minLat: 35.40, maxLat: 35.50 } },
+            { name: '旭区',     bounds: { minLng: 139.44, maxLng: 139.64, minLat: 35.40, maxLat: 35.55 } },
+            { name: '瀬谷区',   bounds: { minLng: 139.40, maxLng: 139.52, minLat: 35.40, maxLat: 35.50 } },
             { name: '泉区',     bounds: { minLng: 139.45, maxLng: 139.55, minLat: 35.35, maxLat: 35.45 } },
             { name: '戸塚区',   bounds: { minLng: 139.40, maxLng: 139.55, minLat: 35.35, maxLat: 35.45 } },
-            { name: '栄区',     bounds: { minLng: 139.40, maxLng: 139.50, minLat: 35.30, maxLat: 35.40 } },
-            { name: '港南区',   bounds: { minLng: 139.60, maxLng: 139.70, minLat: 35.35, maxLat: 35.45 } },
-            { name: '保土ケ谷区',bounds: { minLng:139.57, maxLng:139.65, minLat:35.40, maxLat:35.50 } },
-            { name: '金沢区',   bounds: { minLng: 139.60, maxLng: 139.75, minLat: 35.25, maxLat: 35.35 } },
-            { name: '磯子区',   bounds: { minLng: 139.60, maxLng: 139.70, minLat: 35.30, maxLat: 35.40 } }
+            { name: '栄区',     bounds: { minLng: 139.40, maxLng: 139.59, minLat: 35.30, maxLat: 35.49 } },
+            { name: '港南区',   bounds: { minLng: 139.56, maxLng: 139.70, minLat: 35.35, maxLat: 35.45 } },
+            { name: '保土ケ谷区',bounds: { minLng:139.55, maxLng:139.65, minLat:35.40, maxLat:35.50 } },
+            { name: '金沢区',   bounds: { minLng: 139.58, maxLng: 139.75, minLat: 35.25, maxLat: 35.35 } },
+            { name: '磯子区',   bounds: { minLng: 139.58, maxLng: 139.78, minLat: 35.25, maxLat: 35.40 } }
         ];
 
         const foundDistrict = districts.find(d => d.name === district);
@@ -172,8 +172,8 @@ export default function Map({ className = '' }: MapProps) {
         const bounds = getDistrictBounds(district);
         if (bounds) {
             map.current.fitBounds(bounds, {
-                padding: 50,
-                maxZoom: 16
+                padding: 15,
+                maxZoom: 19
             });
         }
     }, [getDistrictBounds]);
@@ -1085,9 +1085,9 @@ export default function Map({ className = '' }: MapProps) {
                                             const waitingStat = selectedPreschool.stats.find(stat => stat.kind === 'waiting');
                                             
                                             return ageClasses.map((ageClass, index) => {
-                                                const childrenCount = childrenStat?.[ageClass.key as keyof typeof childrenStat] ?? 0;
-                                                const acceptanceCount = acceptanceStat?.[ageClass.key as keyof typeof acceptanceStat] ?? 0;
-                                                const waitingCount = waitingStat?.[ageClass.key as keyof typeof waitingStat] ?? 0;
+                                                const childrenCount = childrenStat?.[ageClass.key as keyof typeof childrenStat];
+                                                const acceptanceCount = acceptanceStat?.[ageClass.key as keyof typeof acceptanceStat];
+                                                const waitingCount = waitingStat?.[ageClass.key as keyof typeof waitingStat];
                                                 
                                                 return (
                                                     <tr key={index} className="hover:bg-gray-50">
@@ -1095,13 +1095,13 @@ export default function Map({ className = '' }: MapProps) {
                                                             {ageClass.label}
                                                         </td>
                                                         <td className="border border-gray-300 px-3 py-2 text-center text-sm text-gray-600 font-semibold">
-                                                            {childrenCount}人
+                                                            {childrenStat ? `${childrenCount ?? 0}人` : <span className="text-gray-400">データなし</span>}
                                                         </td>
                                                         <td className="border border-gray-300 px-3 py-2 text-center text-sm text-gray-600 font-semibold">
-                                                            {acceptanceCount}人
+                                                            {acceptanceStat ? `${acceptanceCount ?? 0}人` : <span className="text-gray-400">データなし</span>}
                                                         </td>
                                                         <td className="border border-gray-300 px-3 py-2 text-center text-sm text-gray-600 font-semibold">
-                                                            {waitingCount}人
+                                                            {waitingStat ? `${waitingCount ?? 0}人` : <span className="text-gray-400">データなし</span>}
                                                         </td>
                                                     </tr>
                                                 );
