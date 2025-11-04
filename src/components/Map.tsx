@@ -73,15 +73,11 @@ const CACHE_DURATION = 5 * 60 * 1000; // 5分間キャッシュ
 
 async function fetchDataFromAPI(area: string): Promise<GeoJSONData> {
     try {
-        console.log(`APIからデータを取得中: ${area}`);
         const response = await fetch(`https://api.hoikudb.com/preschool/stats?area=${encodeURIComponent(area)}`);
-        console.log('APIレスポンス:', response.status, response.statusText);
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
-        const data = await response.json();
-        console.log('APIから取得したデータ:', data);
-        return data;
+        return await response.json();
     } catch (error) {
         console.error(`APIからのデータ取得に失敗しました (${area}):`, error);
         throw error;
@@ -89,25 +85,21 @@ async function fetchDataFromAPI(area: string): Promise<GeoJSONData> {
 }
 
 async function fetchData(area: string): Promise<GeoJSONData> {
-    // キャッシュをチェック
     const cached = dataCache[area];
     const now = Date.now();
-    
+
     if (cached && (now - cached.timestamp) < CACHE_DURATION) {
-        console.log(`キャッシュからデータを取得: ${area}`);
         return cached.data;
     }
 
     try {
-        console.log(`APIからデータを取得: ${area}`);
         const data = await fetchDataFromAPI(area);
-        
-        // キャッシュに保存
+
         dataCache[area] = {
             data,
             timestamp: now
         };
-        
+
         return data;
     } catch (error) {
         console.error(`データの取得に失敗しました (${area}):`, error);
@@ -131,7 +123,7 @@ export default function Map({ className = '' }: MapProps) {
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const [apiError, setApiError] = useState<string | null>(null);
     const [selectedWard, setSelectedWard] = useState<string | null>(null);
-    const [isWardPanelOpen, setIsWardPanelOpen] = useState(true); // 初期状態で区別パネルを表示
+    const [isWardPanelOpen, setIsWardPanelOpen] = useState(true);
 
     // 区別の座標範囲を取得する関数
     const getDistrictBounds = useCallback((district: string) => {
@@ -165,7 +157,6 @@ export default function Map({ className = '' }: MapProps) {
         ] as [[number, number], [number, number]];
     }, []);
 
-    // 選択された区に地図を移動する関数
     const moveToDistrict = useCallback((district: string) => {
         if (!map.current) return;
 
@@ -179,14 +170,10 @@ export default function Map({ className = '' }: MapProps) {
     }, [getDistrictBounds]);
 
     const loadData = useCallback(async () => {
-        // 初期データとして横浜市全体のデータを取得（フォールバック用）
         try {
             setIsLoading(true);
             setApiError(null);
-            console.log('データを取得中...');
             const geoJSONData = await fetchData('横浜市');
-            console.log('取得したデータ:', geoJSONData);
-            console.log('フィーチャー数:', geoJSONData.features.length);
             setAllGeoJSONData(geoJSONData);
             setFilteredGeoJSONData(geoJSONData);
         } catch (error) {
@@ -197,17 +184,11 @@ export default function Map({ className = '' }: MapProps) {
         }
     }, []);
 
-    // 区別のデータを取得する関数
     const loadDataForWard = useCallback(async (ward: string) => {
         try {
             setIsLoading(true);
             setApiError(null);
-            console.log(`区別データを取得中: ${ward}`);
             const geoJSONData = await fetchData(ward);
-            console.log('取得した区別データ:', geoJSONData);
-            console.log('フィーチャー数:', geoJSONData.features.length);
-            
-            // 区別データを直接設定
             setAllGeoJSONData(geoJSONData);
             setFilteredGeoJSONData(geoJSONData);
         } catch (error) {
@@ -220,7 +201,6 @@ export default function Map({ className = '' }: MapProps) {
 
     const applyFilters = useCallback((geoJSONData: GeoJSONData, filterOptions: FilterOptions) => {
         const filteredFeatures = geoJSONData.features.filter(feature => {
-            // statsが文字列（JSON）の場合はパース
             let stats = [];
             if (typeof feature.properties.stats === 'string') {
                 try {
@@ -293,7 +273,6 @@ export default function Map({ className = '' }: MapProps) {
         }
     }, [allGeoJSONData, filters, applyFilters]);
 
-    // iOS Safariのビューポート高さ問題を解決
     useEffect(() => {
         const updateViewportHeight = () => {
             setViewportHeight(`${window.innerHeight}px`);
@@ -302,13 +281,11 @@ export default function Map({ className = '' }: MapProps) {
         let timeoutId: ReturnType<typeof setTimeout>;
         const debouncedUpdate = () => {
             clearTimeout(timeoutId);
-            timeoutId = setTimeout(updateViewportHeight, 100); // デバウンス時間を短縮
+            timeoutId = setTimeout(updateViewportHeight, 100);
         };
 
-        // 初期化
         updateViewportHeight();
 
-        // イベントリスナーを追加
         window.addEventListener('resize', debouncedUpdate, { passive: true });
         window.addEventListener('orientationchange', updateViewportHeight, { passive: true });
 
@@ -347,7 +324,6 @@ export default function Map({ className = '' }: MapProps) {
                 });
 
                 map.current.on('load', () => {
-                    // 地図の初期化完了後、非同期でデータを読み込み
                     loadData().catch(error => {
                         console.error('データの読み込み中にエラーが発生しました:', error);
                     });
@@ -358,15 +334,6 @@ export default function Map({ className = '' }: MapProps) {
                 });
 
                 map.current.addControl(new maplibregl.NavigationControl(), 'top-right');
-
-                // 地図の移動時に区名を更新（データの自動読み込みは削除）
-                //map.current.on('moveend', () => {
-                //    if (map.current) {
-                //        const center = map.current.getCenter();
-                //        const district = getDistrictFromCoordinates(center.lng, center.lat);
-                //        setCurrentDistrict(district);
-                //    }
-                //});
             } catch (error) {
                 console.error('マップの作成中にエラーが発生しました:', error);
             }
@@ -380,26 +347,21 @@ export default function Map({ className = '' }: MapProps) {
         };
     }, [loadData]);
 
-    // グローバルイベントでフィルターパネルを開く（フッターのアイランドボタンから起動）
     useEffect(() => {
         const openHandler = () => {
-            // 検索（フィルターパネル）を開く際は詳細モーダルを閉じる
             setSelectedPreschool(null);
             setIsFilterPanelOpen(true);
-            // オーバーレイ状態通知
             try {
                 const ev = new CustomEvent('overlayState', { detail: { anyOpen: true, type: 'filter' } });
                 window.dispatchEvent(ev as any);
             } catch {}
         };
-        // 型の都合上、イベント名を any 経由で登録
         window.addEventListener('openFilterPanel' as any, openHandler as any);
         return () => {
             window.removeEventListener('openFilterPanel' as any, openHandler as any);
         };
     }, []);
 
-    // グローバルイベントで区別パネルを開く
     useEffect(() => {
         const openWardHandler = () => {
             setSelectedPreschool(null);
@@ -416,10 +378,8 @@ export default function Map({ className = '' }: MapProps) {
         };
     }, []);
 
-    // 区が選択されていない場合、区別パネルを強制表示
     useEffect(() => {
         if (!selectedWard && !isWardPanelOpen && !isFilterPanelOpen && !selectedPreschool) {
-            // 少し遅延させて他の処理が完了してから表示
             const timer = setTimeout(() => {
                 setIsWardPanelOpen(true);
             }, 100);
@@ -427,7 +387,6 @@ export default function Map({ className = '' }: MapProps) {
         }
     }, [selectedWard, isWardPanelOpen, isFilterPanelOpen, selectedPreschool]);
 
-    // isFilterPanelOpen / selectedPreschool / isWardPanelOpen の変更を監視してフッターへ状態通知
     useEffect(() => {
         const anyOpen = !!isFilterPanelOpen || !!selectedPreschool || !!isWardPanelOpen;
         try {
@@ -441,10 +400,8 @@ export default function Map({ className = '' }: MapProps) {
         } catch {}
     }, [isFilterPanelOpen, selectedPreschool, isWardPanelOpen]);
 
-    // 条件追加時に自動スクロール
     useEffect(() => {
         if (filters.ageFilters.length > 0 && scrollContainerRef.current) {
-            // 少し遅延させてDOM更新後にスクロール
             setTimeout(() => {
                 if (scrollContainerRef.current) {
                     scrollContainerRef.current.scrollTo({
@@ -457,14 +414,9 @@ export default function Map({ className = '' }: MapProps) {
     }, [filters.ageFilters.length]);
 
     useEffect(() => {
-        if (!map.current || !map.current.isStyleLoaded()) {
-            console.log('マップが準備できていません');
+        if (!map.current) {
             return;
         }
-
-        console.log('クラスター表示を更新中...');
-        console.log('filteredGeoJSONData:', filteredGeoJSONData);
-        console.log('フィーチャー数:', filteredGeoJSONData?.features.length);
 
         try {
             if (map.current.getLayer('clusters')) {
@@ -484,7 +436,6 @@ export default function Map({ className = '' }: MapProps) {
         }
 
         if (!filteredGeoJSONData) {
-            console.log('filteredGeoJSONDataがありません');
             return;
         }
 
@@ -583,7 +534,6 @@ export default function Map({ className = '' }: MapProps) {
                 const properties = features[0].properties;
                 const geometry = features[0].geometry as GeoJSON.Point;
                 if (geometry.type === 'Point') {
-                    // 詳細を開く際は検索（フィルターパネル）を閉じる
                     setIsFilterPanelOpen(false);
                     try {
                         const ev = new CustomEvent('overlayState', { detail: { anyOpen: true, type: 'detail' } });
@@ -642,9 +592,7 @@ export default function Map({ className = '' }: MapProps) {
                         <button
                             onClick={() => {
                                 setSelectedWard(null);
-                                // 横浜市全体のデータを取得
                                 loadData();
-                                // 地図を横浜市全体に戻す
                                 if (map.current) {
                                     map.current.fitBounds([
                                         [139.4, 35.25],
