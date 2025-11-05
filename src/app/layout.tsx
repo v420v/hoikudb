@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "横浜市保育園空き情報マップ",
-  description: "横浜市の保育園空き情報を地図から探せるサービスです。",
+  title: "保育DB",
+  description: "保育園空き情報を地図から検索できるサービスです！",
   icons: {
     apple: "/apple-touch-icon.png",
   },

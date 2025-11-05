@@ -387,18 +387,34 @@ export default function Map({ className = '' }: MapProps) {
         }
     }, [selectedWard, isWardPanelOpen, isFilterPanelOpen, selectedPreschool]);
 
+    // オーバーレイ状態と区別の状態を通知
     useEffect(() => {
         const anyOpen = !!isFilterPanelOpen || !!selectedPreschool || !!isWardPanelOpen;
         try {
             const ev = new CustomEvent('overlayState', { 
                 detail: { 
                     anyOpen, 
-                    type: isFilterPanelOpen ? 'filter' : (isWardPanelOpen ? 'ward' : (selectedPreschool ? 'detail' : 'none')) 
+                    type: isFilterPanelOpen ? 'filter' : (isWardPanelOpen ? 'ward' : (selectedPreschool ? 'detail' : 'none')),
+                    selectedWard: selectedWard
                 } 
             });
             window.dispatchEvent(ev as any);
         } catch {}
-    }, [isFilterPanelOpen, selectedPreschool, isWardPanelOpen]);
+    }, [isFilterPanelOpen, selectedPreschool, isWardPanelOpen, selectedWard]);
+
+    // 初期状態でも区別の状態を通知
+    useEffect(() => {
+        try {
+            const ev = new CustomEvent('overlayState', { 
+                detail: { 
+                    anyOpen: false, 
+                    type: 'none',
+                    selectedWard: selectedWard
+                } 
+            });
+            window.dispatchEvent(ev as any);
+        } catch {}
+    }, []);
 
     useEffect(() => {
         if (filters.ageFilters.length > 0 && scrollContainerRef.current) {
@@ -581,7 +597,7 @@ export default function Map({ className = '' }: MapProps) {
         >
             {/* 区名表示（フィルターがかかっている場合のみ） */}
             {selectedWard && (
-                <div className="absolute top-4 left-4 z-30 rounded-xl px-4 py-3 bg-white/95 backdrop-blur-sm shadow-xl border border-gray-200">
+                <div className="absolute top-20 left-4 z-30 rounded-xl px-4 py-3 bg-white/95 backdrop-blur-sm shadow-xl border border-gray-200">
                     <div className="flex items-center justify-between gap-3">
                         <div>
                             <h1 className="text-xl font-bold text-gray-800 tracking-wide" id="district-name">
@@ -603,7 +619,7 @@ export default function Map({ className = '' }: MapProps) {
                                     });
                                 }
                             }}
-                            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors duration-200 border border-gray-200 hover:border-gray-300"
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors duration-200 border border-gray-200 hover:border-gray-300 cursor-pointer"
                         >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -646,7 +662,7 @@ export default function Map({ className = '' }: MapProps) {
                             <p className="text-xs text-red-600 mt-1">{apiError}</p>
                             <button
                                 onClick={() => setApiError(null)}
-                                className="text-xs text-red-500 hover:text-red-700 mt-2 underline"
+                                className="text-xs text-red-500 hover:text-red-700 mt-2 underline cursor-pointer"
                             >
                                 閉じる
                             </button>
@@ -722,7 +738,7 @@ export default function Map({ className = '' }: MapProps) {
                                         // 地図を選択された区に移動
                                         moveToDistrict(ward);
                                     }}
-                                    className={`px-4 py-3 rounded-lg border-2 transition-all duration-200 ${
+                                    className={`px-4 py-3 rounded-lg border-2 transition-all duration-200 cursor-pointer ${
                                         selectedWard === ward
                                             ? 'border-blue-500 bg-blue-50 text-blue-700 font-semibold'
                                             : 'border-gray-200 bg-white text-gray-700 hover:border-blue-300 hover:bg-blue-50'
@@ -806,7 +822,7 @@ export default function Map({ className = '' }: MapProps) {
                                             ...prev,
                                             ageFilters: prev.ageFilters.filter((_, i) => i !== index)
                                         }))}
-                                        className="text-red-500 hover:text-red-700 p-1 rounded transition-colors"
+                                        className="text-red-500 hover:text-red-700 p-1 rounded transition-colors cursor-pointer"
                                         aria-label="条件を削除"
                                     >
                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -862,7 +878,7 @@ export default function Map({ className = '' }: MapProps) {
                                                         return { ...filter, minAvailableCount: next };
                                                     })
                                                 }))}
-                                                className="px-4 py-2 border border-gray-300 rounded-l text-gray-700 bg-white active:bg-gray-50"
+                                                className="px-4 py-2 border border-gray-300 rounded-l text-gray-700 bg-white active:bg-gray-50 cursor-pointer"
                                                 aria-label="空き数を減らす"
                                             >
                                                 −
@@ -891,7 +907,7 @@ export default function Map({ className = '' }: MapProps) {
                                                         return { ...filter, minAvailableCount: next };
                                                     })
                                                 }))}
-                                                className="px-4 py-2 border border-gray-300 rounded-r text-gray-700 bg-white active:bg-gray-50"
+                                                className="px-4 py-2 border border-gray-300 rounded-r text-gray-700 bg-white active:bg-gray-50 cursor-pointer"
                                                 aria-label="空き数を増やす"
                                             >
                                                 ＋
@@ -915,7 +931,7 @@ export default function Map({ className = '' }: MapProps) {
                                         ...prev,
                                         ageFilters: [...prev.ageFilters, { ageClass: availableAgeClasses[0], minAvailableCount: 1 }]
                                     }))}
-                                    className="w-full px-3 py-2 border-2 border-dashed border-gray-300 rounded-md text-gray-600 hover:border-blue-400 hover:text-blue-600 transition-colors flex items-center justify-center"
+                                    className="w-full px-3 py-2 border-2 border-dashed border-gray-300 rounded-md text-gray-600 hover:border-blue-400 hover:text-blue-600 transition-colors flex items-center justify-center cursor-pointer"
                                 >
                                     <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -1043,13 +1059,13 @@ export default function Map({ className = '' }: MapProps) {
                                                             {ageClass.label}
                                                         </td>
                                                         <td className="border border-gray-300 px-3 py-2 text-center text-sm text-gray-600 font-semibold">
-                                                            {childrenStat ? `${childrenCount ?? 0}人` : <span className="text-gray-400">データなし</span>}
+                                                            {childrenStat ? `${childrenCount ?? 0}人` : <span className="text-gray-400">データ<br></br>なし</span>}
                                                         </td>
                                                         <td className="border border-gray-300 px-3 py-2 text-center text-sm text-gray-600 font-semibold">
-                                                            {acceptanceStat ? `${acceptanceCount ?? 0}人` : <span className="text-gray-400">データなし</span>}
+                                                            {acceptanceStat ? `${acceptanceCount ?? 0}人` : <span className="text-gray-400">データ<br></br>なし</span>}
                                                         </td>
                                                         <td className="border border-gray-300 px-3 py-2 text-center text-sm text-gray-600 font-semibold">
-                                                            {waitingStat ? `${waitingCount ?? 0}人` : <span className="text-gray-400">データなし</span>}
+                                                            {waitingStat ? `${waitingCount ?? 0}人` : <span className="text-gray-400">データ<br></br>なし</span>}
                                                         </td>
                                                     </tr>
                                                 );
