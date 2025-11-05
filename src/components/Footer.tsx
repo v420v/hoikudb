@@ -112,7 +112,7 @@ export default function Footer() {
               <span className="text-gray-400 ml-1">(CC BY 4.0)</span>
             </p>
             <p className="mt-2 text-xs text-gray-600">
-              本サービス「ほいぷら」は上記公開データを基に一部加工して利用しています。
+              本サービス「保育DB」は上記公開データを基に一部加工して利用しています。
             </p>
             <p className="mt-2 text-[11px] text-gray-500">
               ※本サービスは横浜市の公式サイトではなく、横浜市による保証・後援を受けていません。

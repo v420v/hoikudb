@@ -14,7 +14,7 @@ npm run dev
 ---
 
 ## 保育園データについて
-本サービス「ほいぷら」は、横浜市の公開データ
+本サービス「保育DB」は、横浜市の公開データ
 [保育所等の入所状況](https://www.city.yokohama.lg.jp/kosodate-kyoiku/hoiku-yoji/shisetsu/riyou/info/nyusho-jokyo.html)
 を基に一部加工して利用しています。
 
