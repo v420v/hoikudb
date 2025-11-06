@@ -597,14 +597,11 @@ export default function Map({ className = '' }: MapProps) {
         >
             {/* 区名表示（フィルターがかかっている場合のみ） */}
             {selectedWard && (
-                <div className="absolute top-20 left-4 z-30 rounded-xl px-4 py-3 bg-white/95 backdrop-blur-sm shadow-xl border border-gray-200">
-                    <div className="flex items-center justify-between gap-3">
-                        <div>
-                            <h1 className="text-xl font-bold text-gray-800 tracking-wide" id="district-name">
-                                {selectedWard}
-                            </h1>
-                            <p className="text-sm text-gray-600 mt-0.5">区別で絞り込み中</p>
-                        </div>
+                <div className="absolute top-20 left-4 z-30 rounded-full px-3 py-1.5 bg-white/90 backdrop-blur-md shadow-lg border border-gray-200/50">
+                    <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold text-gray-700" id="district-name">
+                            {selectedWard}
+                        </span>
                         <button
                             onClick={() => {
                                 setSelectedWard(null);
@@ -619,12 +616,42 @@ export default function Map({ className = '' }: MapProps) {
                                     });
                                 }
                             }}
-                            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors duration-200 border border-gray-200 hover:border-gray-300 cursor-pointer"
+                            className="flex items-center justify-center w-5 h-5 rounded-full text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors duration-200 cursor-pointer"
+                            aria-label="絞り込みを解除"
                         >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                             </svg>
-                            解除
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* 表示条件フィルター表示 */}
+            {(filters.searchQuery || filters.ageFilters.length > 0) && (
+                <div className={`absolute ${selectedWard ? 'top-32' : 'top-20'} left-4 z-30 rounded-full px-3 py-1.5 bg-white/90 backdrop-blur-md shadow-lg border border-gray-200/50`}>
+                    <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold text-gray-700">
+                            {(() => {
+                                const parts = [];
+                                if (filters.searchQuery) {
+                                    parts.push(`検索: ${filters.searchQuery}`);
+                                }
+                                if (filters.ageFilters.length > 0) {
+                                    const ageParts = filters.ageFilters.map(f => `${f.ageClass} ${f.minAvailableCount}人以上`);
+                                    parts.push(`年齢: ${ageParts.join(', ')}`);
+                                }
+                                return parts.join(' / ');
+                            })()}
+                        </span>
+                        <button
+                            onClick={() => setFilters({ searchQuery: '', ageFilters: [] })}
+                            className="flex items-center justify-center w-5 h-5 rounded-full text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors duration-200 cursor-pointer"
+                            aria-label="フィルターを解除"
+                        >
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
                         </button>
                     </div>
                 </div>
