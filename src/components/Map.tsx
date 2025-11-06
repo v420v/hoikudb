@@ -627,18 +627,18 @@ export default function Map({ className = '' }: MapProps) {
                 </div>
             )}
 
-            {/* 表示条件フィルター表示（検索・年齢ごとに個別のくくり） */}
+            {/* 表示条件フィルター表示（表示・年齢ごとに個別のくくり） */}
             {(filters.searchQuery || filters.ageFilters.length > 0) && (
                 <div className={`absolute ${selectedWard ? 'top-32' : 'top-20'} left-4 z-30`}>
                     <div className="flex flex-col items-start gap-2">
-                        {/* 検索条件バッジ */}
+                        {/* 表示条件バッジ */}
                         {filters.searchQuery && (
                             <div className="flex items-center gap-2 rounded-full px-3 py-1.5 bg-white/90 backdrop-blur-md shadow-lg border border-gray-200/50">
                                 <span className="text-sm font-semibold text-gray-700">保育園名：{filters.searchQuery}</span>
                                 <button
                                     onClick={() => setFilters(prev => ({ ...prev, searchQuery: '' }))}
                                     className="flex items-center justify-center w-5 h-5 rounded-full text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors duration-200 cursor-pointer"
-                                    aria-label="検索条件をクリア"
+                                    aria-label="表示条件をクリア"
                                 >
                                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -1003,7 +1003,7 @@ export default function Map({ className = '' }: MapProps) {
                 </div>
             </div>
 
-            {/* 右上の検索ボタンはアイランドへ統合したため削除 */}
+            {/* 右上の表示ボタンはアイランドへ統合したため削除 */}
 
             {/* 保育園詳細モーダル */}
             <div
