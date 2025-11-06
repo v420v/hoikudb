@@ -627,32 +627,44 @@ export default function Map({ className = '' }: MapProps) {
                 </div>
             )}
 
-            {/* 表示条件フィルター表示 */}
+            {/* 表示条件フィルター表示（検索・年齢ごとに個別のくくり） */}
             {(filters.searchQuery || filters.ageFilters.length > 0) && (
-                <div className={`absolute ${selectedWard ? 'top-32' : 'top-20'} left-4 z-30 rounded-full px-3 py-1.5 bg-white/90 backdrop-blur-md shadow-lg border border-gray-200/50`}>
-                    <div className="flex items-center gap-2">
-                        <span className="text-sm font-semibold text-gray-700">
-                            {(() => {
-                                const parts = [];
-                                if (filters.searchQuery) {
-                                    parts.push(`検索: ${filters.searchQuery}`);
-                                }
-                                if (filters.ageFilters.length > 0) {
-                                    const ageParts = filters.ageFilters.map(f => `${f.ageClass} ${f.minAvailableCount}人以上`);
-                                    parts.push(`年齢: ${ageParts.join(', ')}`);
-                                }
-                                return parts.join(' / ');
-                            })()}
-                        </span>
-                        <button
-                            onClick={() => setFilters({ searchQuery: '', ageFilters: [] })}
-                            className="flex items-center justify-center w-5 h-5 rounded-full text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors duration-200 cursor-pointer"
-                            aria-label="フィルターを解除"
-                        >
-                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                        </button>
+                <div className={`absolute ${selectedWard ? 'top-32' : 'top-20'} left-4 z-30`}>
+                    <div className="flex flex-col items-start gap-2">
+                        {/* 検索条件バッジ */}
+                        {filters.searchQuery && (
+                            <div className="flex items-center gap-2 rounded-full px-3 py-1.5 bg-white/90 backdrop-blur-md shadow-lg border border-gray-200/50">
+                                <span className="text-sm font-semibold text-gray-700">保育園名：{filters.searchQuery}</span>
+                                <button
+                                    onClick={() => setFilters(prev => ({ ...prev, searchQuery: '' }))}
+                                    className="flex items-center justify-center w-5 h-5 rounded-full text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors duration-200 cursor-pointer"
+                                    aria-label="検索条件をクリア"
+                                >
+                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            </div>
+                        )}
+
+                        {/* 年齢条件バッジ（1行ずつ） */}
+                        {filters.ageFilters.map((f, idx) => (
+                            <div key={`${f.ageClass}-${idx}`} className="flex items-center gap-2 rounded-full px-3 py-1.5 bg-white/90 backdrop-blur-md shadow-lg border border-gray-200/50">
+                                <span className="text-sm font-semibold text-gray-700">年齢: {f.ageClass} {Math.max(1, f.minAvailableCount || 1)}人以上</span>
+                                <button
+                                    onClick={() => setFilters(prev => ({
+                                        ...prev,
+                                        ageFilters: prev.ageFilters.filter((_, i) => i !== idx)
+                                    }))}
+                                    className="flex items-center justify-center w-5 h-5 rounded-full text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors duration-200 cursor-pointer"
+                                    aria-label={`${f.ageClass}の条件を削除`}
+                                >
+                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            </div>
+                        ))}
                     </div>
                 </div>
             )}
@@ -708,7 +720,7 @@ export default function Map({ className = '' }: MapProps) {
                 }}
             >
                 <div
-                    className="w-full sm:w-96 bg-white border border-gray-200 rounded-t-2xl sm:rounded-2xl shadow-2xl max-h-[calc(var(--app-vh)-2rem)] sm:max-h-[calc(var(--app-vh)-6rem)] overflow-hidden"
+                    className="w-full sm:w-96 bg-white border border-gray-200 rounded-t-2xl sm:rounded-2xl shadow-2xl max-h-[calc(var(--app-vh)-8rem)] sm:max-h-[calc(var(--app-vh)-6rem)] overflow-hidden"
                     style={{
                         boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.05)',
                         animation: isWardPanelOpen ? 'slideUpFromCenter 300ms cubic-bezier(0.16, 1, 0.3, 1)' : undefined
@@ -745,7 +757,7 @@ export default function Map({ className = '' }: MapProps) {
                     </div>
 
                     {/* 区別ボタン */}
-                    <div className="px-4 sm:px-6 py-4 overflow-y-auto" style={{ maxHeight: 'calc(var(--app-vh) - 200px)' }}>
+                    <div className="px-4 sm:px-6 py-4 overflow-y-auto" style={{ maxHeight: 'calc(var(--app-vh) - 280px)' }}>
                         <div className="text-lg font-bold text-gray-800 mb-2">
                             横浜市
                         </div>
@@ -785,7 +797,7 @@ export default function Map({ className = '' }: MapProps) {
                 onClick={() => setIsFilterPanelOpen(false)}
             >
                 <div
-                    className="w-full sm:w-80 bg-white border border-gray-200 rounded-t-2xl sm:rounded-2xl shadow-2xl max-h-[calc(var(--app-vh)-2rem)] sm:max-h-[calc(var(--app-vh)-6rem)] overflow-hidden"
+                    className="w-full sm:w-80 bg-white border border-gray-200 rounded-t-2xl sm:rounded-2xl shadow-2xl max-h-[calc(var(--app-vh)-16rem)] sm:max-h-[calc(var(--app-vh)-16rem)] overflow-hidden flex flex-col"
                     style={{
                         boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.05)',
                         animation: isFilterPanelOpen ? 'slideUpFromCenter 300ms cubic-bezier(0.16, 1, 0.3, 1)' : undefined
@@ -817,7 +829,7 @@ export default function Map({ className = '' }: MapProps) {
                     </div>
 
                     {/* スクロール領域 */}
-                    <div ref={scrollContainerRef} className="px-4 sm:px-6 pt-4 pb-4 sm:pb-6 overflow-y-auto" style={{ maxHeight: 'calc(var(--app-vh) - 240px)' }}>
+                    <div ref={scrollContainerRef} className="flex-1 px-4 sm:px-6 pt-4 pb-24 sm:pb-28 overflow-y-auto">
                     {/* 保育園名表示条件（最重要） */}
                     <div className="mb-6">
                         <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -970,7 +982,7 @@ export default function Map({ className = '' }: MapProps) {
                     </div>
 
                     {/* 余白確保（フッター浮かせる） */}
-                    <div className="h-12 sm:h-0" />
+                    <div className="h-16 sm:h-0" />
                     </div>
 
                     {/* フッターアクション */}

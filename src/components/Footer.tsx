@@ -62,7 +62,7 @@ export default function Footer() {
     return () => window.removeEventListener('overlayState' as any, handler as any);
   }, []);
 
-  return hasSelectedWard && (
+  return (
     <div className="pointer-events-none fixed inset-x-0 top-4 z-30 flex sm:justify-center px-4">
       <div className="pointer-events-auto relative w-full sm:w-auto">
         {/* アイランド本体 */}
