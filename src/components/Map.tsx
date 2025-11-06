@@ -333,7 +333,7 @@ export default function Map({ className = '' }: MapProps) {
                     console.error('マップエラー:', error);
                 });
 
-                map.current.addControl(new maplibregl.NavigationControl(), 'top-right');
+                map.current.addControl(new maplibregl.NavigationControl(), 'bottom-right');
             } catch (error) {
                 console.error('マップの作成中にエラーが発生しました:', error);
             }
