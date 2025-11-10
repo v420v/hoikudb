@@ -2,9 +2,10 @@
 # 保育DB
 
 [保育DB](https://hoikudb.com)
-
 横浜市のオープンデータを使用して空きのある保育園を楽に探せるサービスです。
 今後たの市区町村への対応も検討中。
+
+<img width="2639" height="2026" alt="Capture-2025-11-10-223816" src="https://github.com/user-attachments/assets/818abbb5-bc92-4296-b7fb-49bbdf2c3521" />
 
 ## Next.js 起動
 ```
